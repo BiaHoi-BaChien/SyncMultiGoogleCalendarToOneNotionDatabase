@@ -1,4 +1,4 @@
-# A Batch : Multi Google Calendar Sync To One Notion Calendar
+# A Batch : Synchronize multiple Google Calendars to one Notion database
 
 複数のGoogleカレンダーのイベントを1つのNotionカレンダーに同期するバッチ。
 現状は追加／更新のみ。削除は対応していません。
