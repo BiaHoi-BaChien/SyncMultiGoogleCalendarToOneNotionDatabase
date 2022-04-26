@@ -95,9 +95,6 @@ composer install --optimize-autoloader --no-dev
 * * * * *   /usr/bin/php artisan schedule:run
 ```
 
-# Features
-- [ ] 更新モード(NOTION_UPDATABLE=true)を利用すると、Notionに設定したリマインダが無効になる現象を確認しています。
-
 # License
 The source code is licensed MIT.
 
