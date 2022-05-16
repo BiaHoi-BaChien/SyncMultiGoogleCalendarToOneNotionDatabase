@@ -34,12 +34,14 @@ app\Console\Commands\BatchGoogleCalSyncNotion.php
             'personal' => array (
                 'calendar_id' => (string)config('app.google_calendar_id_personal'),
                 'notion_label' => '生活',
-                'max_results' => 20,
             ),
             'business' => array(
                 'calendar_id' => (string)config('app.google_calendar_id_business'),
                 'notion_label' => '仕事',
-                'max_results' => 20,
+            ),
+            'school' => array(
+                'calendar_id' => (string)config('app.google_calendar_id_school'),
+                'notion_label' => '学校',
             )
         );
 
@@ -47,19 +49,12 @@ app\Console\Commands\BatchGoogleCalSyncNotion.php
             'holiday' => array (
                 'calendar_id' => (string)config('app.google_calendar_id_holiday'),
                 'notion_label' => '祝日',
-                'max_results' => 15,
             )
         );
 ```
 > Notionの「ジャンル」プロパティと各カレンダーをこの構造体で紐づけます。
 
 ### 4-2.「googleCalendarId」という名前の「テキスト」のプロパティ
-### 4-3.「numberOfDate」という名前の「関数」のプロパティ。計算式は以下の通り。
-![prop2](https://user-images.githubusercontent.com/93363437/143388721-5e26bb7e-468a-40e7-8db8-edfb7bdbfa0d.png)
-
-```
-toNumber(formatDate(prop("Date"), "YYYYMMDD"))
-```
 
 ## 5. Clone Source Code
 ## 6. 「.env」に各種設定をする
