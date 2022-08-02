@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use DateInterval;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -86,19 +87,24 @@ class NotionModel extends Model
     {
         $page->setTitle("Name", $event->summary);
 
-        if (is_null($event->start->date)) {
-            $start_date = new DateTime($event->start->dateTime, new DateTimeZone(config('app.timezone')));
-            $end_date = new DateTime($event->end->dateTime, new DateTimeZone(config('app.timezone')));
-        } else {
+        // 終日の場合
+        if (!is_null($event->start->date)) {
             $start_date = new DateTime($event->start->date, new DateTimeZone(config('app.timezone')));
             $end_date = new DateTime($event->end->date, new DateTimeZone(config('app.timezone')));
-        }
-
-        $diff_date_time = $start_date->diff($end_date);
-        if ($diff_date_time->format("%Y%M%D%H%I%S") === "000001000000") {
-            $page->setDate("Date", $start_date);
-        } else {
-            $page->setDate("Date", $start_date, $end_date);
+            $diff_date_time = $start_date->diff($end_date);
+            // 1日
+            if ($diff_date_time->format("%Y%M%D%H%I%S") === "000001000000") {
+                $page->setDate("Date", $start_date);
+            // 複数日
+            }else{
+                $new_end_date = $end_date->sub(new DateInterval('P1D'));
+                $page->setDate("Date", $start_date, $new_end_date);
+            }
+        // 時刻ありの場合
+        }else{
+            $start_date = new DateTime($event->start->dateTime, new DateTimeZone(config('app.timezone')));
+            $end_date = new DateTime($event->end->dateTime, new DateTimeZone(config('app.timezone')));
+            $page->setDateTime("Date", $start_date, $end_date);
         }
 
         if (!is_null($notion_label)) {
