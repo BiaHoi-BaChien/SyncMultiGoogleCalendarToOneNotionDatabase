@@ -20,7 +20,7 @@ class BatchGoogleCalSyncNotion extends Command
      *
      * @var string
      */
-    protected $description = 'GoogleカレンダーをNotionのカレンダーに同期する。追加のみ。更新／削除には対応していない。';
+    protected $description = '複数のGoogleカレンダーをNotionのカレンダーに同期する。追加のみ。更新／削除には対応していない。';
 
     /**
      * Create a new command instance.
