@@ -95,5 +95,5 @@ The source code is licensed MIT.
 
 # Author
 
-* @BiaHoi-Ba-Chien
+* @BiaHoi-BaChien
 * E-mail : sugi@clb-biahoi.net
