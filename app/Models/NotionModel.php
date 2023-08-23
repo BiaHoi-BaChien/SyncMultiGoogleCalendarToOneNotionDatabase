@@ -23,7 +23,7 @@ class NotionModel extends Model
     {
         $notion = new Notion((string)config('app.notion_api_token'));
 
-        // 現在Notionに登録されているデータを取得
+        // Notionに登録されているデータを取得
         $filters = new Collection();
         $filters->add(
             Filter::textFilter("googleCalendarId", Operators::EQUALS, $googleCalendarId), 
