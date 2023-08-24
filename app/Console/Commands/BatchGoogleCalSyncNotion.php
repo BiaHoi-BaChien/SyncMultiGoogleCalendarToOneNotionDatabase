@@ -73,7 +73,7 @@ class BatchGoogleCalSyncNotion extends Command
 
         $notions = new NotionModel;
 
-        // 設定値(sync_max_days)に従い日数分のデータをSyncさせる
+        // 設定値(sync_max_days)に従い日数分のデータを同期させる
         $targetDateStart = (string)date("Y-m-d");
         $targetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
 
