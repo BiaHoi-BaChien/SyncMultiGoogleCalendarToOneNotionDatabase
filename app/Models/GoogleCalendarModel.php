@@ -27,7 +27,7 @@ class GoogleCalendarModel extends Model
         $service = new Google_Service_Calendar($client);
 
         $optParams = array(
-            'maxResults' => 50,
+            'maxResults' => 200,
             'orderBy' => 'startTime',
             'singleEvents' => true,
             'timeMin' => date('c', strtotime($targetDateStart ." 00:00:00")),
