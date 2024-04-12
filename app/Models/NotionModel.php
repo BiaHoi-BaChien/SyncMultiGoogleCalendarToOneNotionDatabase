@@ -85,7 +85,9 @@ class NotionModel extends Model
      */
     private function setPropaties(Page $page, Event $event, String $notion_label)
     {
-        $page->setTitle("Name", $event->summary);
+        if (!is_null($event->summary)){
+            $page->setTitle("Name", $event->summary);
+        }
 
         // 終日の場合
         if (!is_null($event->start->date)) {
