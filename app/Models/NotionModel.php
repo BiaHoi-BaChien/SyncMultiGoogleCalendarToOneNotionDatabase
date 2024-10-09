@@ -116,13 +116,11 @@ class NotionModel extends Model
         $page->setText("googleCalendarId", $event->id);
 
         if (!is_null($event->description)) {
-            $description = "\"". $event->description ."\"";
-            $page->setText("メモ", $description);
+            $page->setText("メモ", $event->description);
         }
 
         if (!is_null($event->location)) {
-            $location = "\"". $event->location ."\"";
-            $page->setText("Location", $location);
+            $page->setText('Location', $event->location);
         }
  
         return $page;
