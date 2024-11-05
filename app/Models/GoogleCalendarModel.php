@@ -41,6 +41,36 @@ class GoogleCalendarModel extends Model
     }
 
     /**
+     * 指定したイベントの参加ステータスを確認し、参加する場合はtrue、参加しない場合はfalseを返す
+    *
+    * @param object $event Googleカレンダーのイベントオブジェクト
+    * @return bool 参加する場合はtrue、参加しない場合はfalse
+    */
+    function isUserParticipating($event) {
+        // デフォルトでは未参加と仮定
+        $isParticipating = false;
+
+        // イベントにattendeesプロパティが存在するか確認
+        if (isset($event->attendees)) {
+            // 自分のステータスを確認
+            foreach ($event->attendees as $attendee) {
+                if (isset($attendee->self) && $attendee->self && isset($attendee->responseStatus)) {
+                    $status = $attendee->responseStatus;
+                    if ($status === 'accepted' || $status === 'needsAction') {
+                        $isParticipating = true;
+                    } elseif ($status === 'declined') {
+                        $isParticipating = false;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return $isParticipating;
+    }
+
+
+    /**
     * get client object
     *
     * @return object

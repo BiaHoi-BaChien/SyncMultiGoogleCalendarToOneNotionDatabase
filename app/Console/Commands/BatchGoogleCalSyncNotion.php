@@ -95,6 +95,13 @@ class BatchGoogleCalSyncNotion extends Command
 
             foreach ($events as $event) {
 
+                // 参加型のイベントで自分が参加するもの以外はスルー
+                if (isset($event->attendees)) {
+                    if (!$googlecal->isUserParticipating($event)){
+                        continue;
+                    }
+                }
+
                 // このイベントがNotionに登録されているか検索
                 try{
                     $collections = $notions->getCollectionsFromNotion($event->id);
