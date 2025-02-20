@@ -5,12 +5,7 @@ namespace App\Models;
 use DateInterval;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
-use FiveamCode\LaravelNotionApi\Notion;
-use FiveamCode\LaravelNotionApi\Query\Filters\Filter;
-use FiveamCode\LaravelNotionApi\Query\Filters\Operators;
-use FiveamCode\LaravelNotionApi\Query\Sorting;
-use FiveamCode\LaravelNotionApi\Entities\Page;
+use GuzzleHttp\Client;
 use Google\Service\Calendar\Event;
 use DateTime;
 use DateTimeZone;
@@ -18,133 +13,174 @@ use DateTimeZone;
 class NotionModel extends Model
 {
     use HasFactory;
+    private $client;
+    private $databaseId;
+    private $token;
 
+    /**
+     * NotionModel constructor.
+     */
+    public function __construct()
+    {
+        $this->client = new Client([
+            'base_uri' => 'https://api.notion.com/v1/',
+            'headers' => [
+                'Authorization' => 'Bearer ' . config('app.notion_api_token'),
+                'Notion-Version' => '2022-06-28',
+                'Content-Type' => 'application/json',
+            ],
+        ]);
+        $this->databaseId = config('app.notion_database_id_of_calendar');
+        $this->token = config('app.notion_api_token');
+    }
+
+    /**
+     * 指定したGoogleカレンダーIDに対応するNotionのコレクションを取得する
+     *
+     * @param string $googleCalendarId
+     * @return \Illuminate\Support\Collection
+     */
     public function getCollectionsFromNotion(string $googleCalendarId)
     {
-        $notion = new Notion((string)config('app.notion_api_token'));
+        $response = $this->client->post('databases/' . $this->databaseId . '/query', [
+            'json' => [
+                'filter' => [
+                    'property' => 'googleCalendarId',
+                    'rich_text' => [
+                        'equals' => $googleCalendarId,
+                    ],
+                ],
+            ],
+        ]);
 
-        // Notionに登録されているデータを取得
-        $filters = new Collection();
-        $filters->add(
-            Filter::textFilter("googleCalendarId", Operators::EQUALS, $googleCalendarId), 
-        );
-        $collections = $notion->database(config('app.notion_database_id_of_calendar'))
-            ->filterBy($filters) // filters are optional
-            ->query()
-            ->asCollection();
-
-        return $collections;
+        $data = json_decode($response->getBody(), true);
+        return collect($data['results']);
     }
 
     /**
-     * regist page to Notion
+     * 今日以降、指定した日付までのNotionイベントを取得する
      *
-     * @param Google\Service\Calendar\Event $event
-     * @param String $notion_label
-     * @return boolean
+     * @param string $start_date
+     * @param string $end_date
+     * @return \Illuminate\Support\Collection
      */
-    public function registNotion(Event $event, String $notion_label)
+    public function getUpcomingNotionEvents($start_date, $end_date)
     {
-        $page = new Page();
+        $response = $this->client->post('databases/' . $this->databaseId . '/query', [
+            'json' => [
+                'filter' => [
+                    'and' => [
+                        [
+                            'property' => 'Date',
+                            'date' => [
+                                'on_or_after' => $start_date
+                            ],
+                        ],
+                        [
+                            'property' => 'Date',
+                            'date' => [
+                                'on_or_before' => $end_date
+                            ],
+                        ],
+                        [
+                            'property' => 'googleCalendarId',
+                            'rich_text' => [
+                                'is_not_empty' => true
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
 
-        $page = $this->setPropaties($page, $event, $notion_label);
-
-        \Notion::pages()->createInDatabase(config('app.notion_database_id_of_calendar'), $page);
-
-        return true;
+        $data = json_decode($response->getBody(), true);
+        return collect($data['results']);
     }
 
     /**
-     * update page to Notion
+     * Notionにイベントを登録する
      *
-     * @param Google\Service\Calendar\Event $event
-     * @param String $notion_label
-     * @param FiveamCode\LaravelNotionApi\Entities\Page $collenction
-     * 
-     * @return boolean
+     * @param Event $event
+     * @param string $notion_label
+     * @return bool
      */
-    public function updateNotion(Event $event, String $notion_label, Page $collection)
+    public function registNotionEvent(Event $event, String $notion_label)
     {
-        $page_id = $this->getPageId($collection->getUrl());
+        $page = $this->setPropaties($event, $notion_label);
 
-        $page = new Page();
-        $page->setId($page_id);
-        $page = $this->setPropaties($page, $event, $notion_label);
+        $response = $this->client->post('pages', [
+            'json' => [
+                'parent' => ['database_id' => $this->databaseId],
+                'properties' => $page,
+            ],
+        ]);
 
-        \Notion::pages()->update($page);
-
-        return true;
+        return $response->getStatusCode() === 200;
     }
 
     /**
-     * @param FiveamCode\LaravelNotionApi\Entities\Page $page
-     * @param Google\Service\Calendar\Event $event
-     * @param String $notion_label
-     * 
-     * @return FiveamCode\LaravelNotionApi\Entities\Page $page
+     * Notionからイベントを削除する
+     *
+     * @param string $eventId
+     * @return bool
      */
-    private function setPropaties(Page $page, Event $event, String $notion_label)
+    public function deleteNotionEvent(string $eventId)
     {
+        $response = $this->client->delete('blocks/' . $eventId);
+
+        return $response->getStatusCode() === 200;
+    }
+
+    /**
+     * イベントのプロパティを設定する
+     *
+     * @param Event $event
+     * @param string $notion_label
+     * @return array
+     */
+    private function setPropaties(Event $event, String $notion_label)
+    {
+        $properties = [];
+
         if (!is_null($event->summary)){
-            $page->setTitle("Name", $event->summary);
+            $properties['Name'] = [
+                'title' => [
+                    ['text' => ['content' => $event->summary]]
+                ]
+            ];
         }
 
-        // 終日の場合
         if (!is_null($event->start->date)) {
             $start_date = new DateTime($event->start->date, new DateTimeZone(config('app.timezone')));
             $end_date = new DateTime($event->end->date, new DateTimeZone(config('app.timezone')));
             $diff_date_time = $start_date->diff($end_date);
-            // 1日
             if ($diff_date_time->format("%Y%M%D%H%I%S") === "000001000000") {
-                $page->setDate("Date", $start_date);
-            // 複数日
-            }else{
+                $properties['Date'] = ['date' => ['start' => $start_date->format(DateTime::ATOM)]];
+            } else {
                 $new_end_date = $end_date->sub(new DateInterval('P1D'));
-                $page->setDate("Date", $start_date, $new_end_date);
+                $properties['Date'] = ['date' => ['start' => $start_date->format(DateTime::ATOM), 'end' => $new_end_date->format(DateTime::ATOM)]];
             }
-        // 時刻ありの場合
-        }else{
+        } else {
             $start_date = new DateTime($event->start->dateTime, new DateTimeZone(config('app.timezone')));
             $end_date = new DateTime($event->end->dateTime, new DateTimeZone(config('app.timezone')));
-            $page->setDateTime("Date", $start_date, $end_date);
+            $properties['Date'] = ['date' => ['start' => $start_date->format(DateTime::ATOM), 'end' => $end_date->format(DateTime::ATOM)]];
         }
 
         if (!is_null($notion_label)) {
-            $page->setMultiSelect("ジャンル", [$notion_label]);
+            $properties['ジャンル'] = ['multi_select' => [['name' => $notion_label]]];
         }
 
-        $page->setText("googleCalendarId", $event->id);
+        $properties['googleCalendarId'] = ['rich_text' => [['text' => ['content' => $event->id]]]];
 
         if (!is_null($event->description)) {
-            $page->setText("メモ", $event->description);
+            $properties['メモ'] = ['rich_text' => [['text' => ['content' => $event->description]]]];
         }
 
         if (!is_null($event->location)) {
-            $page->setText('Location', $event->location);
+            $properties['Location'] = ['rich_text' => [['text' => ['content' => $event->location]]]];
         }
- 
-        return $page;
+
+        return $properties;
     }
 
-    /**
-     * get pageId from object Page
-     * 
-     * @param String $url
-     * @return String $page_id
-     */
-    private function getPageId(String $url)
-    {
-        $notion_host = config('app.notion_host');
-        if (!preg_match("/^$notion_host/", $url)) {
-            return null;
-        }
-        $page_id = preg_replace("/$notion_host/", '', $url);
-
-        if (preg_match('/-/', $page_id)) {
-            $result = explode("-", $page_id);
-            $page_id = end($result);
-        }
-
-        return $page_id;
-    }
 }

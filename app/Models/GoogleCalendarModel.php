@@ -7,22 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 use Google_Client;
 use Google_Service_Calendar;
 use Google\Service\Calendar\Event;
-use phpDocumentor\Reflection\DocBlock\Tags\Var_;
 
 class GoogleCalendarModel extends Model
 {
     use HasFactory;
 
     /**
-    * get google event list
-    *
-    * @param integer $max_result
-    * @param String $google_calendar_id 
-    * @return event object
-    */     
+     * Googleカレンダーのイベントリストを取得する
+     *
+     * @param string $targetDateStart 開始日
+     * @param string $targetDateEnd 終了日
+     * @param string $google_calendar_id GoogleカレンダーID
+     * @return array イベントオブジェクトの配列
+     */    
     public function getGoogleCalendarEventList(string $targetDateStart, string $targetDateEnd, string $google_calendar_id)
     {
-        // Googleカレンダーに登録されているデータを取得
         $client = $this->getClient();
         $service = new Google_Service_Calendar($client);
 
@@ -46,7 +45,8 @@ class GoogleCalendarModel extends Model
     * @param object $event Googleカレンダーのイベントオブジェクト
     * @return bool 参加する場合はtrue、参加しない場合はfalse
     */
-    function isUserParticipating($event) {
+    public function isUserParticipating($event)
+    {
         // デフォルトでは未参加と仮定
         $isParticipating = false;
 
@@ -69,12 +69,11 @@ class GoogleCalendarModel extends Model
         return $isParticipating;
     }
 
-
     /**
-    * get client object
-    *
-    * @return object
-    */     
+     * Google APIクライアントオブジェクトを取得する
+     *
+     * @return Google_Client
+     */
     private  function getClient()
     {
         $client = new Google_Client();

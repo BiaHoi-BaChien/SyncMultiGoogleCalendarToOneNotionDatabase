@@ -20,7 +20,7 @@ class BatchGoogleCalSyncNotion extends Command
      *
      * @var string
      */
-    protected $description = '複数のGoogleカレンダーをNotionのカレンダーに同期する。追加のみ。更新／削除には対応していない。';
+    protected $description = '複数のGoogleカレンダーをNotionのカレンダーに同期する。追加／削除のみ。更新には対応していない。';
 
     /**
      * Create a new command instance.
@@ -73,17 +73,27 @@ class BatchGoogleCalSyncNotion extends Command
 
         $notions = new NotionModel;
 
-        // 設定値(sync_max_days)に従い日数分のデータを同期させる
+        // 設定値(sync_max_days)に従い同期対象の日付を取得
         $targetDateStart = (string)date("Y-m-d");
         $targetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
 
-        // Google Calenterから指定日のデータを取得
+        // Notionに登録されている指定範囲のイベントを取得
+        try {
+            $notionEvents = $notions->getUpcomingNotionEvents($targetDateStart, $targetDateEnd);
+        } catch (\Exception $e) {
+            report($e);
+            return Command::FAILURE;
+        }
+
+        $googleEventIds = [];
+
+        // 各Google Calenterから指定範囲のイベントを取得
         foreach (array_keys($calendar_list) as $key){
             if(is_null($calendar_list[$key]['calendar_id'])){
                 continue;
             }                
 
-            $events = array();  
+            $events = [];
             $googlecal = new GoogleCalendarModel;
 
             try{
@@ -94,13 +104,15 @@ class BatchGoogleCalSyncNotion extends Command
             };
 
             foreach ($events as $event) {
-
                 // 参加型のイベントで自分が参加するもの以外はスルー
                 if (isset($event->attendees)) {
                     if (!$googlecal->isUserParticipating($event)){
                         continue;
                     }
                 }
+
+                // イベントIDを配列に格納
+                $googleEventIds[] = $event->id;
 
                 // このイベントがNotionに登録されているか検索
                 try{
@@ -117,12 +129,32 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // Notionに登録
                 try{
-                    $notions->registNotion($event, $calendar_list[$key]['notion_label']); // insert
+                    $notions->registNotionEvent($event, $calendar_list[$key]['notion_label']);
                 }catch(\Exception $e){
                     report($e);
                     return Command::FAILURE;
                 }
             }        
+        }
+        
+        // googleCalendarIdが設定されているにも関わらずGoogleカレンダーに存在しないイベントをNotionから削除
+        foreach ($notionEvents as $notionEvent) {
+            $existsInGoogleCalendar = false;
+            foreach ($googleEventIds as $googleEventId) {
+                if ($googleEventId === $notionEvent['properties']['googleCalendarId']['rich_text'][0]['text']['content']) {
+                    $existsInGoogleCalendar = true;
+                    break;
+                }
+            }
+        
+            if (!$existsInGoogleCalendar) {
+                try {
+                    $notions->deleteNotionEvent($notionEvent['id']);
+                } catch (\Exception $e) {
+                    report($e);
+                    return Command::FAILURE;
+                }
+            }
         }
 
         return Command::SUCCESS;

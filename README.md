@@ -1,7 +1,7 @@
 # A Batch : Synchronize multiple Google Calendars to one Notion database
 
 複数のGoogleカレンダーの予定を1つのNotionカレンダーに同期するバッチ。
-現状は追加のみ。削除・更新は対応していません。
+現状は追加／削除のみ。更新は対応していません。
 
 # Notionカレンダーにイベントが同期された画面イメージ
 
