@@ -1,12 +1,11 @@
 {
-    "name": "laravel/laravel",
+    "name": "biahoi-bachien/multi-googlecalendar-sync-to-one-notioncalendar",
     "type": "project",
-    "description": "The Laravel Framework.",
+    "description": "Sync Google Calendar with Notion DB.",
     "keywords": ["framework", "laravel"],
     "license": "MIT",
     "require": {
         "php": "^8.0|^8.1|^8.2|^8.3",
-        "fiveam-code/laravel-notion-api": "^1.1.0",
         "google/apiclient": "^2.11",
         "guzzlehttp/guzzle": "^7.9",
         "laravel/framework": "^11.00",
