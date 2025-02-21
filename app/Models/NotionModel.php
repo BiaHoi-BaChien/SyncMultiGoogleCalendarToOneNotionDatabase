@@ -149,21 +149,16 @@ class NotionModel extends Model
                 ]
             ];
         }
-
-        if (!is_null($event->start->date)) {
-            $start_date = new DateTime($event->start->date, new DateTimeZone(config('app.timezone')));
-            $end_date = new DateTime($event->end->date, new DateTimeZone(config('app.timezone')));
-            $diff_date_time = $start_date->diff($end_date);
-            if ($diff_date_time->format("%Y%M%D%H%I%S") === "000001000000") {
-                $properties['Date'] = ['date' => ['start' => $start_date->format(DateTime::ATOM)]];
-            } else {
-                $new_end_date = $end_date->sub(new DateInterval('P1D'));
-                $properties['Date'] = ['date' => ['start' => $start_date->format(DateTime::ATOM), 'end' => $new_end_date->format(DateTime::ATOM)]];
-            }
-        } else {
+        if (!is_null($event->start->dateTime)) {
             $start_date = new DateTime($event->start->dateTime, new DateTimeZone(config('app.timezone')));
             $end_date = new DateTime($event->end->dateTime, new DateTimeZone(config('app.timezone')));
             $properties['Date'] = ['date' => ['start' => $start_date->format(DateTime::ATOM), 'end' => $end_date->format(DateTime::ATOM)]];
+        } else {
+            $start_date = new DateTime($event->start->date, new DateTimeZone(config('app.timezone')));
+            $end_date = new DateTime($event->end->date, new DateTimeZone(config('app.timezone')));
+            // 終日イベントの場合、終了日を1日減らし、時間を設定しない
+            $end_date->sub(new DateInterval('P1D'));
+            $properties['Date'] = ['date' => ['start' => $start_date->format('Y-m-d'), 'end' => $end_date->format('Y-m-d')]];
         }
 
         if (!is_null($notion_label)) {
