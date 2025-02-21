@@ -13,7 +13,7 @@ class BatchGoogleCalSyncNotion extends Command
      *
      * @var string
      */
-    protected $signature = 'command:gcal-sync-notion {mode=default : "holiday"を指定した場合、休日カレンダーのみを処理する。"default"の場合は休日カレンダー以外を処理する。}';
+    protected $signature = 'command:gcal-sync-notion {mode=default : "holiday"を指定した場合、祝日カレンダーのみを処理する。"default"の場合は祝日カレンダー以外を処理する。}';
 
     /**
      * The console command description.
@@ -144,6 +144,7 @@ class BatchGoogleCalSyncNotion extends Command
         }
         
         // googleCalendarIdが設定されているにも関わらずGoogleカレンダーに存在しないイベントをNotionから削除
+        // 祝日カレンダーの場合は削除しない
         if ($deleteNotionTasks) {
             foreach ($notionEvents as $notionEvent) {
                 $existsInGoogleCalendar = false;
