@@ -64,31 +64,42 @@ class NotionModel extends Model
      * @param string $end_date
      * @return \Illuminate\Support\Collection
      */
-    public function getUpcomingNotionEvents($start_date, $end_date)
+    public function getUpcomingNotionEvents($start_date, $end_date, $excludeLabels = [])
     {
+        $filters = [
+            [
+                'property' => 'Date',
+                'date' => [
+                    'on_or_after' => $start_date,
+                ],
+            ],
+            [
+                'property' => 'Date',
+                'date' => [
+                    'on_or_before' => $end_date,
+                ],
+            ],
+            [
+                'property' => 'googleCalendarId',
+                'rich_text' => [
+                    'is_not_empty' => true,
+                ],
+            ],
+        ];
+
+        foreach ($excludeLabels as $label) {
+            $filters[] = [
+                'property' => 'ジャンル',
+                'multi_select' => [
+                    'does_not_contain' => $label,
+                ],
+            ];
+        }
+
         $response = $this->client->post('databases/' . $this->databaseId . '/query', [
             'json' => [
                 'filter' => [
-                    'and' => [
-                        [
-                            'property' => 'Date',
-                            'date' => [
-                                'on_or_after' => $start_date
-                            ],
-                        ],
-                        [
-                            'property' => 'Date',
-                            'date' => [
-                                'on_or_before' => $end_date
-                            ],
-                        ],
-                        [
-                            'property' => 'googleCalendarId',
-                            'rich_text' => [
-                                'is_not_empty' => true
-                            ],
-                        ],
-                    ],
+                    'and' => $filters,
                 ],
             ],
         ]);

@@ -67,8 +67,10 @@ class BatchGoogleCalSyncNotion extends Command
         // Mode
         if( $this->argument('mode') === 'holiday'){
             $calendar_list = $this->google_holiday_calendar_list;
+            $deleteNotionTasks = false;
         }else{
             $calendar_list = $this->google_calendar_list;
+            $deleteNotionTasks = true;
         }
 
         $notions = new NotionModel;
@@ -76,15 +78,19 @@ class BatchGoogleCalSyncNotion extends Command
         // 設定値(sync_max_days)に従い同期対象の日付を取得
         $targetDateStart = (string)date("Y-m-d");
         $targetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
+        
+        // 除外するジャンルのラベルを取得
+        $excludeLabels = array_column($this->google_holiday_calendar_list, 'notion_label');
 
         // Notionに登録されている指定範囲のイベントを取得
-        try {
-            $notionEvents = $notions->getUpcomingNotionEvents($targetDateStart, $targetDateEnd);
-        } catch (\Exception $e) {
-            report($e);
-            return Command::FAILURE;
+        if ($deleteNotionTasks) {
+            try {
+                $notionEvents = $notions->getUpcomingNotionEvents($targetDateStart, $targetDateEnd, $excludeLabels);
+            } catch (\Exception $e) {
+                report($e);
+                return Command::FAILURE;
+            }
         }
-
         $googleEventIds = [];
 
         // 各Google Calenterから指定範囲のイベントを取得
@@ -138,25 +144,26 @@ class BatchGoogleCalSyncNotion extends Command
         }
         
         // googleCalendarIdが設定されているにも関わらずGoogleカレンダーに存在しないイベントをNotionから削除
-        foreach ($notionEvents as $notionEvent) {
-            $existsInGoogleCalendar = false;
-            foreach ($googleEventIds as $googleEventId) {
-                if ($googleEventId === $notionEvent['properties']['googleCalendarId']['rich_text'][0]['text']['content']) {
-                    $existsInGoogleCalendar = true;
-                    break;
+        if ($deleteNotionTasks) {
+            foreach ($notionEvents as $notionEvent) {
+                $existsInGoogleCalendar = false;
+                foreach ($googleEventIds as $googleEventId) {
+                    if ($googleEventId === $notionEvent['properties']['googleCalendarId']['rich_text'][0]['text']['content']) {
+                        $existsInGoogleCalendar = true;
+                        break;
+                    }
                 }
-            }
         
-            if (!$existsInGoogleCalendar) {
-                try {
-                    $notions->deleteNotionEvent($notionEvent['id']);
-                } catch (\Exception $e) {
-                    report($e);
-                    return Command::FAILURE;
+                if (!$existsInGoogleCalendar) {
+                    try {
+                        $notions->deleteNotionEvent($notionEvent['id']);
+                    } catch (\Exception $e) {
+                        report($e);
+                        return Command::FAILURE;
+                    }
                 }
             }
         }
-
         return Command::SUCCESS;
     }   
 }
