@@ -36,22 +36,22 @@ class BatchGoogleCalSyncNotion extends Command
         $this->google_calendar_list = array (
             'personal' => array (
                 'calendar_id' => (string)config('app.google_calendar_id_personal'),
-                'notion_label' => '生活',
+                'notion_label' => (string)config('app.google_calendar_label_personal'),
             ),
             'business' => array(
                 'calendar_id' => (string)config('app.google_calendar_id_business'),
-                'notion_label' => '仕事',
+                'notion_label' => (string)config('app.google_calendar_label_business'),
             ),
             'school' => array(
                 'calendar_id' => (string)config('app.google_calendar_id_school'),
-                'notion_label' => '学校',
+                'notion_label' => (string)config('app.google_calendar_label_school'),
             )
         );
 
         $this->google_holiday_calendar_list = array (
             'holiday' => array (
                 'calendar_id' => (string)config('app.google_calendar_id_holiday'),
-                'notion_label' => '祝日',
+                'notion_label' => (string)config('app.google_calendar_label_holiday'),
             )
         );
 
@@ -91,6 +91,7 @@ class BatchGoogleCalSyncNotion extends Command
                 return Command::FAILURE;
             }
         }
+        
         $googleEventIds = [];
 
         // 各Google Calenterから指定範囲のイベントを取得

@@ -250,6 +250,12 @@ return [
     'google_calendar_id_holiday' => env('GOOGLE_CALENDAR_ID_HOLIDAY', null),
     'google_calendar_id_business' => env('GOOGLE_CALENDAR_ID_BUSINESS', null),
     'google_calendar_id_school' => env('GOOGLE_CALENDAR_ID_SCHOOL', null),
+    'google_calendar_label_personal' => env('GOOGLE_CALENDAR_LABEL_PERSONAL', null),
+    'google_calendar_label_holiday' => env('GOOGLE_CALENDAR_LABEL_HOLIDAY', null),
+    'google_calendar_label_business' => env('GOOGLE_CALENDAR_LABEL_BUSINESS', null),
+    'google_calendar_label_school' => env('GOOGLE_CALENDAR_LABEL_SCHOOL', null),
+    'google_calendar_path_to_json'=> env('GOOGLE_CALENDAR_PATH_TO_JSON', null),
+
     'google_calendar_path_to_json'=> env('GOOGLE_CALENDAR_PATH_TO_JSON', null),
     'timezone' => env('TIMEZONE', null),
     'sync_max_days' => env('SYNC_MAX_DAYS', 30),
