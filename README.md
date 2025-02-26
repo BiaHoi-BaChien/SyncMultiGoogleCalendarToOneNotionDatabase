@@ -28,42 +28,21 @@
 ### 4-1. 「マルチセレクト」でラベル付けしたい文字列を設定します。プロパティ名は「ジャンル」
 ![prop1](https://user-images.githubusercontent.com/93363437/143386907-06c81349-ba05-4e6f-a899-6b45f924fb0a.png)
 
-app\Console\Commands\BatchGoogleCalSyncNotion.php
-```php
-        $this->google_calendar_list = array (
-            'personal' => array (
-                'calendar_id' => (string)config('app.google_calendar_id_personal'),
-                'notion_label' => '生活',
-            ),
-            'business' => array(
-                'calendar_id' => (string)config('app.google_calendar_id_business'),
-                'notion_label' => '仕事',
-            ),
-            'school' => array(
-                'calendar_id' => (string)config('app.google_calendar_id_school'),
-                'notion_label' => '学校',
-            )
-        );
-
-        $this->google_holiday_calendar_list = array (
-            'holiday' => array (
-                'calendar_id' => (string)config('app.google_calendar_id_holiday'),
-                'notion_label' => '祝日',
-            )
-        );
-```
-> Notionの「ジャンル」プロパティと各カレンダーをこの構造体で紐づけます。
-
 ### 4-2.「googleCalendarId」という名前の「テキスト」のプロパティ
 
 ## 5. Clone Source Code
-## 6. 「.env」に各種設定をする
+## 6. 「.env」にその他各種設定をする
 
 ```php
 GOOGLE_CALENDAR_ID_PERSONAL=Calenar Id for Personal
 GOOGLE_CALENDAR_ID_HOLIDAY=japanese__ja@holiday.calendar.google.com
 GOOGLE_CALENDAR_ID_BUSINESS=Calenar Id for Business
 GOOGLE_CALENDAR_PATH_TO_JSON=app/json/xxxxxxxxx.json
+
+GOOGLE_CALENDAR_LABEL_PERSONAL=生活
+GOOGLE_CALENDAR_LABEL_BUSINESS=仕事
+GOOGLE_CALENDAR_LABEL_SCHOOL=学校
+GOOGLE_CALENDAR_LABEL_HOLIDAY=祝日
 
 NOTION_API_TOKEN=Api Token of Notion
 NOTION_DATABASE_ID=Database Id of Notion Calendar
