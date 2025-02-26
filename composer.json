@@ -8,7 +8,7 @@
         "php": "^8.0|^8.1|^8.2|^8.3",
         "google/apiclient": "^2.11",
         "guzzlehttp/guzzle": "^7.9",
-        "laravel/framework": "^11.00",
+        "laravel/framework": "^12.00",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.8"
     },
