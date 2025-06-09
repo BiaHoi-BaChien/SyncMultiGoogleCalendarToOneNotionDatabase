@@ -10,7 +10,7 @@ use \App\Models\NotionModel;
 class NotionModelTest extends TestCase
 {
     /**
-     * test for private function validateTodayString.
+     * test for private function validateTargetDate.
      *
      * @return void
      */
