@@ -34,9 +34,9 @@
 ## 6. 「.env」にその他各種設定をする
 
 ```php
-GOOGLE_CALENDAR_ID_PERSONAL=Calenar Id for Personal
+GOOGLE_CALENDAR_ID_PERSONAL=Calendar ID for Personal
 GOOGLE_CALENDAR_ID_HOLIDAY=japanese__ja@holiday.calendar.google.com
-GOOGLE_CALENDAR_ID_BUSINESS=Calenar Id for Business
+GOOGLE_CALENDAR_ID_BUSINESS=Calendar ID for Business
 GOOGLE_CALENDAR_PATH_TO_JSON=app/json/xxxxxxxxx.json
 
 GOOGLE_CALENDAR_LABEL_PERSONAL=生活
@@ -60,7 +60,7 @@ storage>app>json
 
 ![json](https://user-images.githubusercontent.com/93363437/143384668-e7fbd910-bd78-4e70-a18b-cf51665d9e60.png)
 
-## 8. Composer intall
+## 8. Composer install
 ```bash
 composer install --optimize-autoloader --no-dev
 ```
