@@ -197,4 +197,49 @@ class NotionModel extends Model
         return $properties;
     }
 
+    /**
+     * Validate that a given value is a date string in YYYYMMDD format.
+     *
+     * @param mixed $targetDate
+     * @return bool
+     */
+    private function validateTargetDate($targetDate)
+    {
+        if (is_null($targetDate)) {
+            return false;
+        }
+
+        return preg_match('/^\d{8}$/', strval($targetDate)) === 1;
+    }
+
+    /**
+     * Extract the page ID from a Notion page URL.
+     *
+     * @param string $pageUrl
+     * @return string|null
+     */
+    private function getPageId($pageUrl)
+    {
+        if (!is_string($pageUrl)) {
+            return null;
+        }
+
+        $parsed = parse_url($pageUrl);
+        if ($parsed === false || !isset($parsed['host']) || !preg_match('/(?:^|\.)notion\.so$/', $parsed['host'])) {
+            return null;
+        }
+
+        if (!isset($parsed['path'])) {
+            return null;
+        }
+
+        $path = trim($parsed['path'], '/');
+        if ($path === '') {
+            return null;
+        }
+
+        $parts = explode('-', $path);
+        return end($parts);
+    }
+
 }

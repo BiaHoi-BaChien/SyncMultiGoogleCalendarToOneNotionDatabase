@@ -19,10 +19,10 @@ class NotionModelTest extends TestCase
         $notion = new NotionModel;
         $method = new \ReflectionMethod($notion, 'validateTargetDate');
         $method->setAccessible(true);
-        $result = $method->invokeArgs($notion, [20211129]);
+        $result = $method->invokeArgs($notion, ["20211129"]);
         $this->assertTrue($result);
 
-        $result = $method->invokeArgs($notion, [123]);
+        $result = $method->invokeArgs($notion, ["123"]);
         $this->assertFalse($result);
 
         // $result = $method->invokeArgs($notion, ["abcdefgh"]);
