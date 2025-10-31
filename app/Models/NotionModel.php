@@ -26,7 +26,7 @@ class NotionModel extends Model
             'base_uri' => 'https://api.notion.com/v1/',
             'headers' => [
                 'Authorization' => 'Bearer ' . config('app.notion_api_token'),
-                'Notion-Version' => '2023-08-16',
+                'Notion-Version' => config('app.notion_version'),
                 'Content-Type' => 'application/json',
             ],
         ]);

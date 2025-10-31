@@ -246,6 +246,7 @@ return [
     'notion_api_token' => env('NOTION_API_TOKEN', null),
     'notion_updatable' => env('NOTION_UPDATABLE', false),
     'notion_host' => env('NOTION_HOST', null),
+    'notion_version' => env('NOTION_VERSION', '2022-06-28'),
     'google_calendar_id_personal' => env('GOOGLE_CALENDAR_ID_PERSONAL', null),
     'google_calendar_id_holiday' => env('GOOGLE_CALENDAR_ID_HOLIDAY', null),
     'google_calendar_id_business' => env('GOOGLE_CALENDAR_ID_BUSINESS', null),
