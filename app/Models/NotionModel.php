@@ -26,7 +26,7 @@ class NotionModel extends Model
             'base_uri' => 'https://api.notion.com/v1/',
             'headers' => [
                 'Authorization' => 'Bearer ' . config('app.notion_api_token'),
-                'Notion-Version' => '2022-06-28',
+                'Notion-Version' => '2023-08-16',
                 'Content-Type' => 'application/json',
             ],
         ]);
@@ -156,8 +156,11 @@ class NotionModel extends Model
         if (!is_null($event->summary)){
             $properties['Name'] = [
                 'title' => [
-                    ['text' => ['content' => $event->summary]]
-                ]
+                    [
+                        'type' => 'text',
+                        'text' => ['content' => $event->summary],
+                    ],
+                ],
             ];
         }
         if (!is_null($event->start->dateTime)) {
@@ -184,14 +187,35 @@ class NotionModel extends Model
             $properties['ジャンル'] = ['multi_select' => [['name' => $notion_label]]];
         }
 
-        $properties['googleCalendarId'] = ['rich_text' => [['text' => ['content' => $event->id]]]];
+        $properties['googleCalendarId'] = [
+            'rich_text' => [
+                [
+                    'type' => 'text',
+                    'text' => ['content' => $event->id],
+                ],
+            ],
+        ];
 
         if (!is_null($event->description)) {
-            $properties['メモ'] = ['rich_text' => [['text' => ['content' => $event->description]]]];
+            $properties['メモ'] = [
+                'rich_text' => [
+                    [
+                        'type' => 'text',
+                        'text' => ['content' => $event->description],
+                    ],
+                ],
+            ];
         }
 
         if (!is_null($event->location)) {
-            $properties['Location'] = ['rich_text' => [['text' => ['content' => $event->location]]]];
+            $properties['Location'] = [
+                'rich_text' => [
+                    [
+                        'type' => 'text',
+                        'text' => ['content' => $event->location],
+                    ],
+                ],
+            ];
         }
 
         return $properties;
