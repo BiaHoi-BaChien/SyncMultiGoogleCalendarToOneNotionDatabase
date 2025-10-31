@@ -47,6 +47,7 @@ GOOGLE_CALENDAR_LABEL_HOLIDAY=祝日
 NOTION_API_TOKEN=Api Token of Notion
 NOTION_DATABASE_ID=Database Id of Notion Calendar
 NOTION_UPDATABLE=true
+NOTION_VERSION=API version of Notion (e.g. 2022-06-28)
 
 TIMEZONE=Asia/Tokyo
 ```
