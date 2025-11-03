@@ -1,9 +1,0 @@
-- [ ] ① 参照点の列挙: notion API 呼び出し箇所を全検索
-- [ ] ② HTTP層: ヘッダ追加/上書き
-- [ ] ③ 親指定の書き換え: database_id → data_source_id
-- [ ] ④ エンドポイント: databases/*/query → data_sources/*/query
-- [ ] ⑤ スキーマ系: databases → data_sources へ移行
-- [ ] ⑥ 検索API: object=database → data_source
-- [ ] ⑦ SDK v5 API面の置換
-- [ ] ⑧ Webhookペイロード対応
-- [ ] ⑨ 回帰テスト（単一/複数 data source）

@@ -1,79 +1,133 @@
-# A Batch : Synchronize multiple Google Calendars to one Notion database
+# A Batch: Synchronize multiple Google Calendars to one Notion database
 
-複数のGoogleカレンダーの予定を1つのNotionカレンダーに同期するバッチ。
-現状は追加／削除のみ。更新は対応していません。
+複数のGoogleカレンダーの予定を1つのNotionカレンダーに同期するバッチです。Google側のイベントをNotionに追加し、Googleに存在しないイベントを削除します（祝日カレンダーのみのモードでは削除を行いません）。イベント内容の更新には対応していません。
 
-# Notionカレンダーにイベントが同期された画面イメージ
+## Notionカレンダーにイベントが同期された画面イメージ
 
 ![3つのカレンダー（個人用、仕事用、日本の祝日）から1つのNotionカレンダーにイベントを同期したイメージ。](https://user-images.githubusercontent.com/93363437/143379424-49ca91f5-3a07-484b-8007-a0ee3d1082e4.png)
 
-3つのカレンダー（個人用、仕事用、日本の祝日）から1つのNotionカレンダーにイベントを同期したイメージ。
+## Requirements
 
-# Installation
+- Google Calendar API の利用設定（サービスアカウントキーを取得できること）
+- Notion API のインテグレーション設定
+- PHP 8.x / Composer
 
-## 1. Google Calendar APIの準備をして個人用と仕事用の各カレンダーにAPIからアクセスできるようにする。
-![20211125115123 (2)](https://user-images.githubusercontent.com/93363437/143381645-3ab76251-bf87-4fe7-b1d1-43bcdd523df0.png)
+## Installation
 
-※Google Calendar APIの準備はこちらの記事が参考になりました。→ https://liginc.co.jp/472637
+### 1. Google Calendar API の準備
 
-## 2. Notionにて新しいインテグレーションの準備をする。
-![notion](https://user-images.githubusercontent.com/93363437/143382921-beb2157c-32e0-4de2-be35-e2fbd232fbab.png)
+Google Cloud でサービスアカウントを作成し、Google Calendar API を有効化して対象カレンダー（個人用・仕事用・学校用・祝日など）にアクセスできるよう権限を設定します。サービスアカウントキー（JSON）をダウンロードしてください。
 
-## 3. Notionの「共有」にて新しいインテグレーションがカレンダーを編集できるようにする。
-![notion2](https://user-images.githubusercontent.com/93363437/143383010-3a4ac152-6928-44c8-afd2-6faddd541275.png)
+> Google Calendar API の準備については [LIGさんの記事](https://liginc.co.jp/472637) が参考になります。
 
-※Notion側の準備はこちらの記事が参考になりました。→ https://tektektech.com/notion-api/#Notionintegration
+### 2. Notion インテグレーションの準備
 
-## 4. Notionカレンダーに本バッチが参照する3つのプロパティを準備する。
-### 4-1. 「マルチセレクト」でラベル付けしたい文字列を設定します。プロパティ名は「ジャンル」
-![prop1](https://user-images.githubusercontent.com/93363437/143386907-06c81349-ba05-4e6f-a899-6b45f924fb0a.png)
+Notion で新しいインテグレーションを作成し、同期対象のデータベースと共有します。
 
-### 4-2.「googleCalendarId」という名前の「テキスト」のプロパティ
+> Notion API のセットアップは [tektektech さんの記事](https://tektektech.com/notion-api/#Notionintegration) が参考になります。
 
-## 5. Clone Source Code
-## 6. 「.env」にその他各種設定をする
+Notion データベース側では次のプロパティを作成しておきます。
 
-```php
-GOOGLE_CALENDAR_ID_PERSONAL=Calendar ID for Personal
+| プロパティ名 | 種別 | 説明 |
+| --- | --- | --- |
+| `ジャンル` | マルチセレクト | カレンダー種別（生活、仕事、学校、祝日 など） |
+| `googleCalendarId` | テキスト | Google のイベント ID を保存 |
+| `メモ`、`Location` など | 任意 | 任意の補足情報 |
+
+> Notion の新しい API (data source) を利用するため、対象データベースの **Data Source ID** を取得しておくと後述の `.env` で指定できます。未指定の場合は API 経由で自動取得します。
+
+### 3. ソースコードの取得
+
+```bash
+git clone https://github.com/BiaHoi-BaChien/SyncMultiGoogleCalendarToOneNotionDatabase.git
+cd SyncMultiGoogleCalendarToOneNotionDatabase
+```
+
+### 4. 依存パッケージのインストール
+
+```bash
+composer install --optimize-autoloader --no-dev
+```
+
+### 5. 環境変数の設定
+
+`.env` を作成し、以下の値を設定します。`.env.example` をコピーして編集すると便利です。
+
+```bash
+cp .env.example .env
+```
+
+主要な環境変数は以下のとおりです。
+
+```dotenv
+# Google Calendar
+GOOGLE_CALENDAR_ID_PERSONAL=your_personal_calendar_id
+GOOGLE_CALENDAR_ID_BUSINESS=your_work_calendar_id
+GOOGLE_CALENDAR_ID_SCHOOL=your_school_calendar_id
 GOOGLE_CALENDAR_ID_HOLIDAY=japanese__ja@holiday.calendar.google.com
-GOOGLE_CALENDAR_ID_BUSINESS=Calendar ID for Business
-GOOGLE_CALENDAR_PATH_TO_JSON=app/json/xxxxxxxxx.json
+GOOGLE_CALENDAR_PATH_TO_JSON=app/json/your-service-account.json
 
 GOOGLE_CALENDAR_LABEL_PERSONAL=生活
 GOOGLE_CALENDAR_LABEL_BUSINESS=仕事
 GOOGLE_CALENDAR_LABEL_SCHOOL=学校
 GOOGLE_CALENDAR_LABEL_HOLIDAY=祝日
 
-NOTION_API_TOKEN=Api Token of Notion
-NOTION_DATABASE_ID=Database Id of Notion Calendar
-NOTION_UPDATABLE=true
-NOTION_VERSION=API version of Notion (e.g. 2022-06-28)
+# Notion
+NOTION_API_TOKEN=notion_api_token
+NOTION_DATABASE_ID=notion_database_id
+NOTION_DATA_SOURCE_ID=datasource_id-of-your-database   # 省略可（未設定の場合は自動取得）
+NOTION_VERSION=2025-09-03
+NOTION_UPDATABLE=false
 
-TIMEZONE=Asia/Tokyo
-```
-個人・仕事用のカレンダーID、
-NotionのAPIトークンやNotionカレンダーのDatabase Idを設定します。
-
-## 7. Google Calendar APIを準備したときに作成したアカウントの「サービスアカウントキー」(JSONファイル)を設置する。
-```
-storage>app>json
+# 同期期間（日数）
+SYNC_MAX_DAYS=90
 ```
 
-![json](https://user-images.githubusercontent.com/93363437/143384668-e7fbd910-bd78-4e70-a18b-cf51665d9e60.png)
+- `GOOGLE_CALENDAR_ID_*` は同期したいカレンダー ID を設定します。不要なカレンダーは空にして構いません。
+- `GOOGLE_CALENDAR_PATH_TO_JSON` はダウンロードしたサービスアカウントキーを `storage/app/json` に配置した場合の相対パスが `app/json/...` になります。
+- `NOTION_DATA_SOURCE_ID` は Notion のデータベース設定画面から取得できます。指定しなくても自動で解決されます。
+- `SYNC_MAX_DAYS` は今日から何日先までの予定を同期するかを制御します。
 
-## 8. Composer install
+タイムゾーンを変更したい場合は `config/app.php` の `timezone` を編集してください（デフォルトは `Asia/Ho_Chi_Minh`）。
+
+### 6. Google サービスアカウントキーの配置
+
+ダウンロードした JSON キーを `storage/app/json/` に配置します。
+
+```
+storage/
+└── app/
+    └── json/
+        └── your-service-account.json
+```
+
+### 7. バッチの実行
+
+コマンドは artisan から実行します。
+
 ```bash
-composer install --optimize-autoloader --no-dev
-```
-## 9. Batchの設定
-```bash
-* * * * *   /usr/bin/php artisan schedule:run
+php artisan command:gcal-sync-notion
 ```
 
-# License
+引数に `holiday` を指定すると祝日カレンダーのみを同期し、Notion からの削除処理は行いません。
+
+```bash
+php artisan command:gcal-sync-notion holiday
+```
+
+### 8. スケジュール設定（任意）
+
+cron などで定期実行する場合は次のように設定します。
+
+```bash
+* * * * * /usr/bin/php artisan schedule:run
+```
+
+## License
+
 The source code is licensed MIT.
 
-# Author
+## Author
 
 * @BiaHoi-BaChien
 * E-mail : sugi@clb-biahoi.net

@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use Google\Service\Calendar\Event;
 use DateTime;
 use DateTimeZone;
+use RuntimeException;
 
 class NotionModel extends Model
 {
@@ -16,6 +17,9 @@ class NotionModel extends Model
     private $client;
     private $databaseId;
     private $token;
+    private $dataSourceId;
+
+    private static $dataSourceIdCache = [];
 
     /**
      * NotionModel constructor.
@@ -32,6 +36,41 @@ class NotionModel extends Model
         ]);
         $this->databaseId = config('app.notion_database_id_of_calendar');
         $this->token = config('app.notion_api_token');
+        $this->dataSourceId = null;
+    }
+
+    /**
+     * Resolve the data source identifier, preferring configuration but falling back to discovery.
+     *
+     * @return string
+     */
+    private function getDataSourceId()
+    {
+        if (!empty($this->dataSourceId)) {
+            return $this->dataSourceId;
+        }
+
+        $configuredId = config('app.notion_data_source_id');
+        if (!empty($configuredId)) {
+            $this->dataSourceId = $configuredId;
+            return $this->dataSourceId;
+        }
+
+        if (isset(self::$dataSourceIdCache[$this->databaseId])) {
+            $this->dataSourceId = self::$dataSourceIdCache[$this->databaseId];
+            return $this->dataSourceId;
+        }
+
+        $response = $this->client->get('databases/' . $this->databaseId);
+        $data = json_decode($response->getBody(), true);
+
+        if (!empty($data['data_sources'][0]['id'])) {
+            $this->dataSourceId = $data['data_sources'][0]['id'];
+            self::$dataSourceIdCache[$this->databaseId] = $this->dataSourceId;
+            return $this->dataSourceId;
+        }
+
+        throw new RuntimeException('Unable to resolve Notion data source id for database ' . $this->databaseId . '.');
     }
 
     /**
@@ -42,7 +81,9 @@ class NotionModel extends Model
      */
     public function getCollectionsFromNotion(string $googleCalendarId)
     {
-        $response = $this->client->post('databases/' . $this->databaseId . '/query', [
+        $dataSourceId = $this->getDataSourceId();
+
+        $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
             'json' => [
                 'filter' => [
                     'property' => 'googleCalendarId',
@@ -96,7 +137,9 @@ class NotionModel extends Model
             ];
         }
 
-        $response = $this->client->post('databases/' . $this->databaseId . '/query', [
+        $dataSourceId = $this->getDataSourceId();
+
+        $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
             'json' => [
                 'filter' => [
                     'and' => $filters,
@@ -119,9 +162,14 @@ class NotionModel extends Model
     {
         $page = $this->setPropaties($event, $notion_label);
 
+        $dataSourceId = $this->getDataSourceId();
+
         $response = $this->client->post('pages', [
             'json' => [
-                'parent' => ['database_id' => $this->databaseId],
+                'parent' => [
+                    'type' => 'data_source_id',
+                    'data_source_id' => $dataSourceId,
+                ],
                 'properties' => $page,
             ],
         ]);
