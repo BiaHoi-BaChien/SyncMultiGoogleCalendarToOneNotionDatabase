@@ -244,8 +244,6 @@ return [
     */
     'notion_database_id_of_calendar' => env('NOTION_DATABASE_ID', null),
     'notion_api_token' => env('NOTION_API_TOKEN', null),
-    'notion_updatable' => env('NOTION_UPDATABLE', false),
-    'notion_host' => env('NOTION_HOST', null),
     'notion_version' => env('NOTION_VERSION', '2025-09-03'),
     'notion_data_source_id' => env('NOTION_DATA_SOURCE_ID'),
     'google_calendar_id_personal' => env('GOOGLE_CALENDAR_ID_PERSONAL', null),
