@@ -27,13 +27,13 @@ class Kernel extends ConsoleKernel
         // 個人・仕事用カレンダーは30分毎に起動する
         $schedule->command('command:gcal-sync-notion')
             ->everyThirtyMinutes()
-            ->timezone('Asia/Ho_Chi_Minh')
+            ->timezone(config('app.timezone'))
             ->between('6:00', '23:00');
 
         // 休日カレンダーは月1回だけ起動する
         $schedule->command('command:gcal-sync-notion holiday')
             ->monthly()
-            ->timezone('Asia/Ho_Chi_Minh');
+            ->timezone(config('app.timezone'));
     }
 
     /**
