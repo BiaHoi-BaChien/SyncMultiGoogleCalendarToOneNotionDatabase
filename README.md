@@ -87,7 +87,7 @@ SYNC_MAX_DAYS=90
 - `NOTION_DATA_SOURCE_ID` は Notion のデータベース設定画面から取得できます。指定しなくても自動で解決されます。
 - `SYNC_MAX_DAYS` は今日から何日先までの予定を同期するかを制御します。
 
-タイムゾーンを変更したい場合は `config/app.php` の `timezone` を編集してください（デフォルトは `Asia/Ho_Chi_Minh`）。
+タイムゾーンを変更したい場合は `.env` の `TIMEZONE` を編集してください（未設定時のデフォルトは `Asia/Ho_Chi_Minh`）。
 
 ### 6. Google サービスアカウントキーの配置
 
