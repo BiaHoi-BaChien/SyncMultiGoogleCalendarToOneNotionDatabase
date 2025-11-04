@@ -255,6 +255,7 @@ return [
     'google_calendar_label_business' => env('GOOGLE_CALENDAR_LABEL_BUSINESS', null),
     'google_calendar_label_school' => env('GOOGLE_CALENDAR_LABEL_SCHOOL', null),
     'google_calendar_path_to_json'=> env('GOOGLE_CALENDAR_PATH_TO_JSON', null),
+    'sync_report_mail_to' => env('SYNC_REPORT_MAIL_TO', null),
 
     'sync_max_days' => env('SYNC_MAX_DAYS', 30),
 ];

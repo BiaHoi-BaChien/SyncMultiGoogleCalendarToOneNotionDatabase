@@ -72,6 +72,8 @@ GOOGLE_CALENDAR_LABEL_BUSINESS=仕事
 GOOGLE_CALENDAR_LABEL_SCHOOL=学校
 GOOGLE_CALENDAR_LABEL_HOLIDAY=祝日
 
+SYNC_REPORT_MAIL_TO=notify@example.com
+
 # Notion
 NOTION_API_TOKEN=notion_api_token
 NOTION_DATABASE_ID=notion_database_id
@@ -86,6 +88,7 @@ SYNC_MAX_DAYS=90
 - `GOOGLE_CALENDAR_PATH_TO_JSON` はダウンロードしたサービスアカウントキーを `storage/app/json` に配置した場合の相対パスが `app/json/...` になります。
 - `NOTION_DATA_SOURCE_ID` は Notion のデータベース設定画面から取得できます。指定しなくても自動で解決されます。
 - `SYNC_MAX_DAYS` は今日から何日先までの予定を同期するかを制御します。
+- `SYNC_REPORT_MAIL_TO` を設定すると同期結果のサマリーメールが送信されます。空の場合はメール送信をスキップします。
 
 タイムゾーンを変更したい場合は `.env` の `TIMEZONE` を編集してください（未設定時のデフォルトは `Asia/Ho_Chi_Minh`）。
 
