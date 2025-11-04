@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Mail\Mailables\SentMessage;
+use App\Mail\SyncReportMail;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -77,28 +77,16 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
-        Mail::assertSent(function (SentMessage $message) {
-            $original = method_exists($message, 'getOriginalMessage')
-                ? $message->getOriginalMessage()
-                : $message->getSymfonyMessage();
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
+            $mail->build();
 
-            $subject = method_exists($original, 'getSubject') ? $original->getSubject() : null;
-            $body = null;
-            if (method_exists($original, 'getTextBody')) {
-                $body = $original->getTextBody();
-            } elseif (method_exists($original, 'getBody')) {
-                $bodyObject = $original->getBody();
-                if (method_exists($bodyObject, 'bodyToString')) {
-                    $body = $bodyObject->bodyToString();
-                } elseif (method_exists($bodyObject, '__toString')) {
-                    $body = (string) $bodyObject;
-                }
-            }
+            $rendered = $mail->render();
 
-            return $subject === 'Notion同期レポート'
-                && is_string($body)
-                && str_contains($body, 'Personal Label: 1件')
-                && str_contains($body, '以上の予定をNotionデータベースに同期しました。');
+            return $mail->subject === 'Notion同期レポート'
+                && in_array('Personal Label: 1件', $mail->summaryLines, true)
+                && is_string($rendered)
+                && str_contains($rendered, 'Personal Label: 1件')
+                && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
         });
     }
 
@@ -159,27 +147,16 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
-        Mail::assertSent(function (SentMessage $message) {
-            $original = method_exists($message, 'getOriginalMessage')
-                ? $message->getOriginalMessage()
-                : $message->getSymfonyMessage();
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
+            $mail->build();
 
-            $subject = method_exists($original, 'getSubject') ? $original->getSubject() : null;
-            $body = null;
-            if (method_exists($original, 'getTextBody')) {
-                $body = $original->getTextBody();
-            } elseif (method_exists($original, 'getBody')) {
-                $bodyObject = $original->getBody();
-                if (method_exists($bodyObject, 'bodyToString')) {
-                    $body = $bodyObject->bodyToString();
-                } elseif (method_exists($bodyObject, '__toString')) {
-                    $body = (string) $bodyObject;
-                }
-            }
+            $rendered = $mail->render();
 
-            return $subject === 'Notion同期レポート'
-                && is_string($body)
-                && str_contains($body, 'Holiday Label: 1件');
+            return $mail->subject === 'Notion同期レポート'
+                && in_array('Holiday Label: 1件', $mail->summaryLines, true)
+                && is_string($rendered)
+                && str_contains($rendered, 'Holiday Label: 1件')
+                && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
         });
     }
 
