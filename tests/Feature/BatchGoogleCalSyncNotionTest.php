@@ -3,17 +3,31 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Mail;
-use Mockery;
 use Symfony\Component\Console\Command\Command;
+use Tests\Support\Fakes\GoogleCalendarModelFake;
+use Tests\Support\Fakes\NotionModelFake;
 use Tests\TestCase;
 
+/**
+ * @runTestsInSeparateProcesses
+ * @preserveGlobalState disabled
+ */
 class BatchGoogleCalSyncNotionTest extends TestCase
 {
-    protected function tearDown(): void
+    protected function setUp(): void
     {
-        Mockery::close();
+        parent::setUp();
 
-        parent::tearDown();
+        if (!class_exists(\App\Models\NotionModel::class, false)) {
+            class_alias(NotionModelFake::class, \App\Models\NotionModel::class);
+        }
+
+        if (!class_exists(\App\Models\GoogleCalendarModel::class, false)) {
+            class_alias(GoogleCalendarModelFake::class, \App\Models\GoogleCalendarModel::class);
+        }
+
+        NotionModelFake::reset();
+        GoogleCalendarModelFake::reset();
     }
 
     private function setDefaultCalendarConfig(): void
@@ -40,30 +54,27 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $event = (object) ['id' => 'event-1'];
 
-        $notionMock = Mockery::mock('overload:App\\Models\\NotionModel');
-        $notionMock->shouldReceive('getUpcomingNotionEvents')
-            ->once()
-            ->andReturn(collect());
-        $notionMock->shouldReceive('getCollectionsFromNotion')
-            ->once()
-            ->with('event-1')
-            ->andReturn(collect());
-        $notionMock->shouldReceive('registNotionEvent')
-            ->once()
-            ->with($event, 'Personal Label')
-            ->andReturnTrue();
-        $notionMock->shouldNotReceive('deleteNotionEvent');
+        NotionModelFake::$upcomingEventsReturn = collect();
+        NotionModelFake::$collectionsReturn = [
+            'event-1' => collect(),
+        ];
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
 
-        $googleMock = Mockery::mock('overload:App\\Models\\GoogleCalendarModel');
-        $googleMock->shouldReceive('getGoogleCalendarEventList')
-            ->once()
-            ->andReturn([$event]);
-        $googleMock->shouldNotReceive('isUserParticipating');
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
 
         Mail::fake();
 
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
+        $this->assertSame(['event-1'], NotionModelFake::$getCollectionsCalls);
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
 
         Mail::assertSent(function ($message) {
             $original = method_exists($message, 'getOriginalMessage')
@@ -97,27 +108,24 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $event = (object) ['id' => 'event-1'];
 
-        $notionMock = Mockery::mock('overload:App\\Models\\NotionModel');
-        $notionMock->shouldReceive('getUpcomingNotionEvents')
-            ->once()
-            ->andReturn(collect());
-        $notionMock->shouldReceive('getCollectionsFromNotion')
-            ->once()
-            ->with('event-1')
-            ->andReturn(collect(['existing']));
-        $notionMock->shouldNotReceive('registNotionEvent');
-        $notionMock->shouldNotReceive('deleteNotionEvent');
+        NotionModelFake::$upcomingEventsReturn = collect();
+        NotionModelFake::$collectionsReturn = [
+            'event-1' => collect(['existing']),
+        ];
 
-        $googleMock = Mockery::mock('overload:App\\Models\\GoogleCalendarModel');
-        $googleMock->shouldReceive('getGoogleCalendarEventList')
-            ->once()
-            ->andReturn([$event]);
-        $googleMock->shouldNotReceive('isUserParticipating');
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
 
         Mail::fake();
 
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
+        $this->assertSame(['event-1'], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
 
         Mail::assertNothingSent();
     }
@@ -129,28 +137,26 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $event = (object) ['id' => 'holiday-event'];
 
-        $notionMock = Mockery::mock('overload:App\\Models\\NotionModel');
-        $notionMock->shouldReceive('getCollectionsFromNotion')
-            ->once()
-            ->with('holiday-event')
-            ->andReturn(collect());
-        $notionMock->shouldReceive('registNotionEvent')
-            ->once()
-            ->with($event, 'Holiday Label')
-            ->andReturnTrue();
-        $notionMock->shouldNotReceive('getUpcomingNotionEvents');
-        $notionMock->shouldNotReceive('deleteNotionEvent');
+        NotionModelFake::$collectionsReturn = [
+            'holiday-event' => collect(),
+        ];
+        NotionModelFake::$registResults = [
+            'holiday-event' => true,
+        ];
 
-        $googleMock = Mockery::mock('overload:App\\Models\\GoogleCalendarModel');
-        $googleMock->shouldReceive('getGoogleCalendarEventList')
-            ->once()
-            ->andReturn([$event]);
-        $googleMock->shouldNotReceive('isUserParticipating');
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-holiday' => [$event],
+        ];
 
         Mail::fake();
 
         $this->artisan('command:gcal-sync-notion', ['mode' => 'holiday'])
             ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(0, NotionModelFake::$getUpcomingCalls);
+        $this->assertSame(['holiday-event'], NotionModelFake::$getCollectionsCalls);
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
 
         Mail::assertSent(function ($message) {
             $original = method_exists($message, 'getOriginalMessage')
@@ -198,29 +204,24 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ],
         ]);
 
-        $notionMock = Mockery::mock('overload:App\\Models\\NotionModel');
-        $notionMock->shouldReceive('getUpcomingNotionEvents')
-            ->once()
-            ->andReturn($notionEvents);
-        $notionMock->shouldReceive('getCollectionsFromNotion')
-            ->once()
-            ->with('event-existing')
-            ->andReturn(collect(['existing']));
-        $notionMock->shouldNotReceive('registNotionEvent');
-        $notionMock->shouldReceive('deleteNotionEvent')
-            ->once()
-            ->with('notion-event-1');
+        NotionModelFake::$upcomingEventsReturn = $notionEvents;
+        NotionModelFake::$collectionsReturn = [
+            'event-existing' => collect(['existing']),
+        ];
 
-        $googleMock = Mockery::mock('overload:App\\Models\\GoogleCalendarModel');
-        $googleMock->shouldReceive('getGoogleCalendarEventList')
-            ->once()
-            ->andReturn([(object) ['id' => 'event-existing']]);
-        $googleMock->shouldNotReceive('isUserParticipating');
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [(object) ['id' => 'event-existing']],
+        ];
 
         Mail::fake();
 
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
+        $this->assertSame(['event-existing'], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame(['notion-event-1'], NotionModelFake::$deleteCalls);
 
         Mail::assertNothingSent();
     }
