@@ -28,13 +28,14 @@ class BatchGoogleCalSyncNotion extends Command
      *
      * @return void
      */
-    private $google_calendar_list;
-
     public function __construct()
     {
         parent::__construct();
+    }
 
-        $this->google_calendar_list = array (
+    private function getGoogleCalendarList(): array
+    {
+        return array (
             'personal' => array (
                 'calendar_id' => (string)config('app.google_calendar_id_personal'),
                 'notion_label' => (string)config('app.google_calendar_label_personal'),
@@ -48,14 +49,16 @@ class BatchGoogleCalSyncNotion extends Command
                 'notion_label' => (string)config('app.google_calendar_label_school'),
             )
         );
+    }
 
-        $this->google_holiday_calendar_list = array (
+    private function getGoogleHolidayCalendarList(): array
+    {
+        return array (
             'holiday' => array (
                 'calendar_id' => (string)config('app.google_calendar_id_holiday'),
                 'notion_label' => (string)config('app.google_calendar_label_holiday'),
             )
         );
-
     }
 
     /**
@@ -65,12 +68,14 @@ class BatchGoogleCalSyncNotion extends Command
      */
     public function handle()
     {
+        $holidayCalendarList = $this->getGoogleHolidayCalendarList();
+
         // Mode
         if( $this->argument('mode') === 'holiday'){
-            $calendar_list = $this->google_holiday_calendar_list;
+            $calendar_list = $holidayCalendarList;
             $deleteNotionTasks = false;
         }else{
-            $calendar_list = $this->google_calendar_list;
+            $calendar_list = $this->getGoogleCalendarList();
             $deleteNotionTasks = true;
         }
 
@@ -86,7 +91,7 @@ class BatchGoogleCalSyncNotion extends Command
         $targetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
         
         // 除外するジャンルのラベルを取得
-        $excludeLabels = array_column($this->google_holiday_calendar_list, 'notion_label');
+        $excludeLabels = array_column($holidayCalendarList, 'notion_label');
 
         // Notionに登録されている指定範囲のイベントを取得
         if ($deleteNotionTasks) {
