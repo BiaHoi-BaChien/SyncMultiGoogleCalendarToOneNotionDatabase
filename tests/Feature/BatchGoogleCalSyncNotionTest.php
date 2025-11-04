@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests\\Feature;
+namespace Tests\Feature;
 
-use Illuminate\\Support\\Facades\\Mail;
+use Illuminate\Support\Facades\Mail;
 use Mockery;
-use Symfony\\Component\\Console\\Command\\Command;
-use Tests\\TestCase;
+use Symfony\Component\Console\Command\Command;
+use Tests\TestCase;
 
 class BatchGoogleCalSyncNotionTest extends TestCase
 {
