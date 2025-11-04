@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Models\NotionModel;
 use App\Models\GoogleCalendarModel;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\SyncReportMail;
 
 class BatchGoogleCalSyncNotion extends Command
 {
@@ -196,14 +197,11 @@ class BatchGoogleCalSyncNotion extends Command
             }
 
             if (!empty($summaryLines)) {
-                $body = implode(PHP_EOL, $summaryLines) . PHP_EOL . '以上の予定をNotionデータベースに同期しました。';
                 $mailTo = config('app.sync_report_mail_to');
 
                 if (!empty($mailTo)) {
                     try {
-                        Mail::raw($body, function ($message) use ($mailTo) {
-                            $message->to($mailTo)->subject('Notion同期レポート');
-                        });
+                        Mail::to($mailTo)->send(new SyncReportMail($summaryLines));
                     } catch (\Exception $e) {
                         report($e);
                         return Command::FAILURE;
