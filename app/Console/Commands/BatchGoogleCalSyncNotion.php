@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\NotionModel;
 use App\Models\GoogleCalendarModel;
+use Illuminate\Support\Facades\Mail;
 
 class BatchGoogleCalSyncNotion extends Command
 {
@@ -73,6 +74,11 @@ class BatchGoogleCalSyncNotion extends Command
             $deleteNotionTasks = true;
         }
 
+        $syncCounts = [];
+        foreach (array_keys($calendar_list) as $key) {
+            $syncCounts[$key] = 0;
+        }
+
         $notions = new NotionModel;
 
         // 設定値(sync_max_days)に従い同期対象の日付を取得
@@ -136,12 +142,16 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // Notionに登録
                 try{
-                    $notions->registNotionEvent($event, $calendar_list[$key]['notion_label']);
+                    $registered = $notions->registNotionEvent($event, $calendar_list[$key]['notion_label']);
                 }catch(\Exception $e){
                     report($e);
                     return Command::FAILURE;
                 }
-            }        
+
+                if ($registered) {
+                    $syncCounts[$key]++;
+                }
+            }
         }
         
         // googleCalendarIdが設定されているにも関わらずGoogleカレンダーに存在しないイベントをNotionから削除
@@ -166,6 +176,37 @@ class BatchGoogleCalSyncNotion extends Command
                 }
             }
         }
+        $totalSynced = array_sum($syncCounts);
+
+        if ($totalSynced > 0) {
+            $summaryLines = [];
+            foreach ($calendar_list as $key => $calendar) {
+                $count = $syncCounts[$key] ?? 0;
+                if ($count <= 0) {
+                    continue;
+                }
+
+                $label = $calendar['notion_label'] ?? $key;
+                $summaryLines[] = sprintf('%s: %d件', $label, $count);
+            }
+
+            if (!empty($summaryLines)) {
+                $body = implode(PHP_EOL, $summaryLines) . PHP_EOL . '以上の予定をNotionデータベースに同期しました。';
+                $mailTo = config('app.sync_report_mail_to');
+
+                if (!empty($mailTo)) {
+                    try {
+                        Mail::raw($body, function ($message) use ($mailTo) {
+                            $message->to($mailTo)->subject('Notion同期レポート');
+                        });
+                    } catch (\Exception $e) {
+                        report($e);
+                        return Command::FAILURE;
+                    }
+                }
+            }
+        }
+
         return Command::SUCCESS;
-    }   
+    }
 }
