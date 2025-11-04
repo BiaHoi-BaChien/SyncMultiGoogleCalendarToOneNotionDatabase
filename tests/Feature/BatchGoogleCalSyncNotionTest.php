@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Mail\Mailables\SentMessage;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Console\Command\Command;
 use Tests\Support\Fakes\GoogleCalendarModelFake;
@@ -76,7 +77,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
-        Mail::assertSent(function ($message) {
+        Mail::assertSent(function (SentMessage $message) {
             $original = method_exists($message, 'getOriginalMessage')
                 ? $message->getOriginalMessage()
                 : $message->getSymfonyMessage();
@@ -158,7 +159,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
-        Mail::assertSent(function ($message) {
+        Mail::assertSent(function (SentMessage $message) {
             $original = method_exists($message, 'getOriginalMessage')
                 ? $message->getOriginalMessage()
                 : $message->getSymfonyMessage();
