@@ -42,7 +42,7 @@ class NotionModelHttpTest extends TestCase
 
         $firstRequest = $history[0]['request'];
         $this->assertSame('POST', $firstRequest->getMethod());
-        $this->assertSame('/data_sources/test-data-source-id/query', $firstRequest->getUri()->getPath());
+        $this->assertSame('/v1/data_sources/test-data-source-id/query', $firstRequest->getUri()->getPath());
 
         $firstBody = json_decode((string) $firstRequest->getBody(), true);
         $this->assertSame([
@@ -56,7 +56,7 @@ class NotionModelHttpTest extends TestCase
 
         $secondRequest = $history[1]['request'];
         $this->assertSame('POST', $secondRequest->getMethod());
-        $this->assertSame('/data_sources/test-data-source-id/query', $secondRequest->getUri()->getPath());
+        $this->assertSame('/v1/data_sources/test-data-source-id/query', $secondRequest->getUri()->getPath());
 
         $secondBody = json_decode((string) $secondRequest->getBody(), true);
         $this->assertArrayHasKey('filter', $secondBody);
@@ -114,7 +114,7 @@ class NotionModelHttpTest extends TestCase
 
         $request = $history[0]['request'];
         $this->assertSame('POST', $request->getMethod());
-        $this->assertSame('/pages', $request->getUri()->getPath());
+        $this->assertSame('/v1/pages', $request->getUri()->getPath());
 
         $body = json_decode((string) $request->getBody(), true);
         $this->assertSame('data_source_id', $body['parent']['type']);
@@ -153,7 +153,7 @@ class NotionModelHttpTest extends TestCase
 
         $request = $history[0]['request'];
         $this->assertSame('DELETE', $request->getMethod());
-        $this->assertSame('/blocks/notion-event-id', $request->getUri()->getPath());
+        $this->assertSame('/v1/blocks/notion-event-id', $request->getUri()->getPath());
     }
 
     private function createModelWithMockHandler(array $responses, array &$history): NotionModel
@@ -166,6 +166,7 @@ class NotionModelHttpTest extends TestCase
         $client = new Client([
             'handler' => $handlerStack,
             'base_uri' => 'https://api.notion.com/v1/',
+            'http_errors' => false,
         ]);
 
         $model = new NotionModel();
