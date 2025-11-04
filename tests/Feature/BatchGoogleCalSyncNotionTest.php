@@ -4,15 +4,15 @@ namespace Tests\Feature;
 
 use Illuminate\Mail\Mailables\SentMessage;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Symfony\Component\Console\Command\Command;
 use Tests\Support\Fakes\GoogleCalendarModelFake;
 use Tests\Support\Fakes\NotionModelFake;
 use Tests\TestCase;
 
-/**
- * @runTestsInSeparateProcesses
- * @preserveGlobalState disabled
- */
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 class BatchGoogleCalSyncNotionTest extends TestCase
 {
     protected function setUp(): void
