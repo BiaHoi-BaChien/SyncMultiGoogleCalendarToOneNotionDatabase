@@ -15,3 +15,6 @@ yarn-error.log
 /.vscode
 bootstrap/cache/packages.php
 bootstrap/cache/services.php
+.phpunit.cache/test-results
+.gitignore
+phpunit.xml.bak
