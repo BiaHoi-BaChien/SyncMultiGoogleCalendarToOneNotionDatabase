@@ -84,6 +84,7 @@ class BatchGoogleCalSyncNotion extends Command
         foreach (array_keys($calendar_list) as $key) {
             $syncCounts[$key] = 0;
         }
+        $syncDetails = [];
 
         $notions = new NotionModel;
 
@@ -156,6 +157,16 @@ class BatchGoogleCalSyncNotion extends Command
 
                 if ($registered) {
                     $syncCounts[$key]++;
+
+                    $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
+                    if (!array_key_exists($calendarLabel, $syncDetails)) {
+                        $syncDetails[$calendarLabel] = [];
+                    }
+
+                    $syncDetails[$calendarLabel][] = [
+                        'start' => $this->formatEventStart($event),
+                        'summary' => isset($event->summary) ? (string) $event->summary : '',
+                    ];
                 }
             }
         }
@@ -185,7 +196,7 @@ class BatchGoogleCalSyncNotion extends Command
         $totalSynced = array_sum($syncCounts);
 
         if ($totalSynced > 0) {
-            $summaryLines = [];
+            $totals = [];
             foreach ($calendar_list as $key => $calendar) {
                 $count = $syncCounts[$key] ?? 0;
                 if ($count <= 0) {
@@ -193,15 +204,15 @@ class BatchGoogleCalSyncNotion extends Command
                 }
 
                 $label = $calendar['notion_label'] ?? $key;
-                $summaryLines[] = sprintf('%s: %d件', $label, $count);
+                $totals[$label] = $count;
             }
 
-            if (!empty($summaryLines)) {
+            if (!empty($totals)) {
                 $mailTo = config('app.sync_report_mail_to');
 
                 if (!empty($mailTo)) {
                     try {
-                        Mail::to($mailTo)->send(new SyncReportMail($summaryLines));
+                        Mail::to($mailTo)->send(new SyncReportMail($totals, $syncDetails));
                     } catch (\Exception $e) {
                         report($e);
                         return Command::FAILURE;
@@ -211,5 +222,29 @@ class BatchGoogleCalSyncNotion extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    private function formatEventStart(object $event): string
+    {
+        if (!isset($event->start)) {
+            return '';
+        }
+
+        $start = $event->start;
+
+        if (isset($start->dateTime) && $start->dateTime !== '') {
+            try {
+                $dateTime = new \DateTime($start->dateTime);
+                return $dateTime->format('Y-m-d H:i');
+            } catch (\Exception $e) {
+                return (string) $start->dateTime;
+            }
+        }
+
+        if (isset($start->date) && $start->date !== '') {
+            return (string) $start->date;
+        }
+
+        return '';
     }
 }
