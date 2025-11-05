@@ -175,14 +175,30 @@ class BatchGoogleCalSyncNotion extends Command
         // 祝日カレンダーの場合は削除しない
         if ($deleteNotionTasks) {
             foreach ($notionEvents as $notionEvent) {
+                $googleCalendarId = null;
+
+                if (isset($notionEvent['properties']['googleCalendarId'])) {
+                    $googleCalendarProperty = $notionEvent['properties']['googleCalendarId'];
+                    $richText = $googleCalendarProperty['rich_text'] ?? null;
+
+                    if (is_array($richText) && isset($richText[0]) && is_array($richText[0])) {
+                        $googleCalendarId = $richText[0]['text']['content'] ?? null;
+                    }
+                }
+
+                if (!is_string($googleCalendarId) || $googleCalendarId === '') {
+                    // googleCalendarId が取得できない場合は削除候補に含めない
+                    continue;
+                }
+
                 $existsInGoogleCalendar = false;
                 foreach ($googleEventIds as $googleEventId) {
-                    if ($googleEventId === $notionEvent['properties']['googleCalendarId']['rich_text'][0]['text']['content']) {
+                    if ($googleEventId === $googleCalendarId) {
                         $existsInGoogleCalendar = true;
                         break;
                     }
                 }
-        
+
                 if (!$existsInGoogleCalendar) {
                     try {
                         $notions->deleteNotionEvent($notionEvent['id']);
