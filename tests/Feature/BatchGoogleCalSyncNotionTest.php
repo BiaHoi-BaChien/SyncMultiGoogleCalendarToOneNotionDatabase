@@ -52,6 +52,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
+        config()->set('app.sync_max_days', 3);
 
         $event = (object) [
             'id' => 'event-1',
@@ -77,6 +78,11 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
+        $expectedStart = date('Y-m-d');
+        $expectedEnd = date('Y-m-d', strtotime('+3 day'));
+        $this->assertSame([
+            [$expectedStart, $expectedEnd, ['Holiday Label']],
+        ], NotionModelFake::$getUpcomingArgs);
         $this->assertSame(['event-1'], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
