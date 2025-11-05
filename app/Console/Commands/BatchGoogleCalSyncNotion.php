@@ -109,9 +109,9 @@ class BatchGoogleCalSyncNotion extends Command
 
         // 各Google Calenterから指定範囲のイベントを取得
         foreach (array_keys($calendar_list) as $key){
-            if(is_null($calendar_list[$key]['calendar_id'])){
+            if(empty($calendar_list[$key]['calendar_id'])){
                 continue;
-            }                
+            }
 
             $events = [];
             $googlecal = new GoogleCalendarModel;
