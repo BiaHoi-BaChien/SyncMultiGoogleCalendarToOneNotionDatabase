@@ -2,6 +2,9 @@
 
 複数のGoogleカレンダーの予定を1つのNotionカレンダーに同期するバッチです。Google側のイベントをNotionに追加し、Googleに存在しないイベントを削除します（祝日カレンダーのみのモードでは削除を行いません）。イベント内容の更新には対応していません。
 
+- 同期で新しく登録した件数とイベント概要を、メールおよび Slack DM（任意設定）でレポートできます。
+- Notion Data Source ID を `.env` に設定しなくても、API から自動取得してキャッシュします。
+
 ## Notionカレンダーにイベントが同期された画面イメージ
 
 ![3つのカレンダー（個人用、仕事用、日本の祝日）から1つのNotionカレンダーにイベントを同期したイメージ。](https://user-images.githubusercontent.com/93363437/143379424-49ca91f5-3a07-484b-8007-a0ee3d1082e4.png)
@@ -74,6 +77,11 @@ GOOGLE_CALENDAR_LABEL_HOLIDAY=祝日
 
 SYNC_REPORT_MAIL_TO=notify@example.com
 
+# Slack (任意)
+SLACK_BOT=false
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_DM_USER_IDS=U12345678,U23456789
+
 # Notion
 NOTION_API_TOKEN=notion_api_token
 NOTION_DATABASE_ID=notion_database_id
@@ -89,6 +97,7 @@ SYNC_MAX_DAYS=90
 - `NOTION_DATA_SOURCE_ID` は Notion のデータベース設定画面から取得できます。指定しなくても自動で解決されます。
 - `SYNC_MAX_DAYS` は今日から何日先までの予定を同期するかを制御します。
 - `SYNC_REPORT_MAIL_TO` を設定すると同期結果のサマリーメールが送信されます。空の場合はメール送信をスキップします。
+- Slack 通知を利用したい場合は `SLACK_BOT=true` とし、Bot User OAuth Token（`SLACK_BOT_TOKEN`）と DM を送りたいユーザー ID（カンマ区切りで指定）を設定してください。Slack 設定が完了していない場合は通知を送信しません。
 
 タイムゾーンを変更したい場合は `.env` の `TIMEZONE` を編集してください（未設定時のデフォルトは `Asia/Ho_Chi_Minh`）。
 
@@ -116,6 +125,23 @@ php artisan command:gcal-sync-notion
 ```bash
 php artisan command:gcal-sync-notion holiday
 ```
+
+## 同期結果の通知
+
+同期で新規に登録したイベントがある場合、下記の方法でレポートを送信します。
+
+- **メール通知**: `SYNC_REPORT_MAIL_TO` に送信先を設定すると、同期件数と各イベントの概要をテキストメールで送信します。
+- **Slack 通知**: Slack Bot を有効化すると、指定したユーザーの DM に同じ内容を投稿します。エラーが発生した場合は同スレッドにエラー概要も送信します。
+
+Slack 通知を利用するには、Bot User OAuth Token を取得した上で `.env` に次の値を設定してください。
+
+```dotenv
+SLACK_BOT=true
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_DM_USER_IDS=U12345678,U23456789
+```
+
+`SLACK_DM_USER_IDS` には通知したいユーザー ID をカンマ区切りで指定します。設定が不足している場合は Slack への投稿を自動的にスキップします。
 
 ### 8. スケジュール設定（任意）
 
