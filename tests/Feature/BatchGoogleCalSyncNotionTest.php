@@ -223,4 +223,37 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         Mail::assertNothingSent();
     }
+
+    public function test_command_skips_notion_events_when_google_calendar_id_missing(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $notionEvents = collect([
+            [
+                'id' => 'notion-event-without-id',
+                'properties' => [
+                    'googleCalendarId' => [
+                        'rich_text' => [],
+                    ],
+                ],
+            ],
+        ]);
+
+        NotionModelFake::$upcomingEventsReturn = $notionEvents;
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+
+        Mail::assertNothingSent();
+    }
 }
