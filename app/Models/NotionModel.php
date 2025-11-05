@@ -99,11 +99,12 @@ class NotionModel extends Model
     }
 
     /**
-     * 今日以降、指定した日付までのNotionイベントを取得する
+     * 指定した開始日から終了日までの範囲に含まれる Notion イベントを取得する。
      *
-     * @param string $start_date
-     * @param string $end_date
-     * @return \Illuminate\Support\Collection
+     * @param string $start_date   取得する期間の開始日（ISO 8601 形式の日付文字列）。
+     * @param string $end_date     取得する期間の終了日（ISO 8601 形式の日付文字列）。
+     * @param array  $excludeLabels 取得対象から除外するジャンル名の配列。
+     * @return \Illuminate\Support\Collection 取得したイベントのコレクション。
      */
     public function getUpcomingNotionEvents($start_date, $end_date, $excludeLabels = [])
     {
