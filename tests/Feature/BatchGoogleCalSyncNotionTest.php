@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\SyncReportMail;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -103,6 +104,52 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 && str_contains($rendered, 'Personal Label: 1件')
                 && str_contains($rendered, '  - 2024-05-10 09:00 Board Meeting')
                 && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
+        });
+    }
+
+    public function test_command_sends_slack_dm_when_enabled(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', null);
+        config()->set('app.slack_bot_enabled', true);
+        config()->set('app.slack_bot_token', 'xoxb-test-token');
+        config()->set('app.slack_dm_user_ids', 'U0123456789');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Board Meeting',
+            'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect();
+        NotionModelFake::$collectionsReturn = [
+            'event-1' => collect(),
+        ];
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        Http::fake([
+            'https://slack.com/api/chat.postMessage' => Http::response([
+                'ok' => true,
+                'ts' => '1714976400.000100',
+            ]),
+        ]);
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        Http::assertSentCount(1);
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://slack.com/api/chat.postMessage'
+                && $request['channel'] === 'U0123456789'
+                && $request['text'] === "Personal Label: 1件\n  - 2024-05-10 09:00 Board Meeting\n以上の予定をNotionデータベースに同期しました。";
         });
     }
 

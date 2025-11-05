@@ -256,6 +256,9 @@ return [
     'google_calendar_label_school' => env('GOOGLE_CALENDAR_LABEL_SCHOOL', null),
     'google_calendar_path_to_json'=> env('GOOGLE_CALENDAR_PATH_TO_JSON', null),
     'sync_report_mail_to' => env('SYNC_REPORT_MAIL_TO', null),
+    'slack_bot_enabled' => filter_var(env('SLACK_BOT', false), FILTER_VALIDATE_BOOL),
+    'slack_bot_token' => env('SLACK_BOT_TOKEN', null),
+    'slack_dm_user_ids' => env('SLACK_DM_USER_IDS', null),
 
     'sync_max_days' => env('SYNC_MAX_DAYS', 30),
 ];

@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\SyncReportFormatter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -39,27 +40,7 @@ class SyncReportMail extends Mailable
      */
     public function build()
     {
-        $lines = [];
-
-        foreach ($this->totals as $label => $count) {
-            $lines[] = sprintf('%s: %d件', $label, $count);
-
-            $events = $this->details[$label] ?? [];
-            foreach ($events as $event) {
-                $start = $event['start'];
-                $summary = $event['summary'];
-                $detail = trim(trim($start) . ' ' . trim($summary));
-                if ($detail === '') {
-                    $detail = '(詳細なし)';
-                }
-
-                $lines[] = sprintf('  - %s', $detail);
-            }
-        }
-
-        $lines[] = '以上の予定をNotionデータベースに同期しました。';
-
-        $body = implode(PHP_EOL, $lines);
+        $body = SyncReportFormatter::formatText($this->totals, $this->details);
 
         return $this
             ->subject('Notion同期レポート')

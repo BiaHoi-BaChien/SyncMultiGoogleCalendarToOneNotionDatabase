@@ -7,6 +7,8 @@ use App\Models\NotionModel;
 use App\Models\GoogleCalendarModel;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SyncReportMail;
+use App\Services\SlackNotifier;
+use App\Support\SyncReportFormatter;
 
 class BatchGoogleCalSyncNotion extends Command
 {
@@ -224,12 +226,24 @@ class BatchGoogleCalSyncNotion extends Command
             }
 
             if (!empty($totals)) {
+                $bodyText = SyncReportFormatter::formatText($totals, $syncDetails);
+
+                $slackNotifier = new SlackNotifier();
+                $slackMessages = [];
+                try {
+                    $slackMessages = $slackNotifier->send($bodyText);
+                } catch (\Throwable $e) {
+                    report($e);
+                    return Command::FAILURE;
+                }
+
                 $mailTo = config('app.sync_report_mail_to');
 
                 if (!empty($mailTo)) {
                     try {
                         Mail::to($mailTo)->send(new SyncReportMail($totals, $syncDetails));
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
+                        $slackNotifier->notifyError($slackMessages ?? [], $e);
                         report($e);
                         return Command::FAILURE;
                     }
