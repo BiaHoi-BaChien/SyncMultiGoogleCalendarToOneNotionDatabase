@@ -30,6 +30,6 @@ class SyncReportFormatter
 
         $lines[] = '以上の予定をNotionデータベースに同期しました。';
 
-        return implode(PHP_EOL, $lines);
+        return implode("\n", $lines);
     }
 }
