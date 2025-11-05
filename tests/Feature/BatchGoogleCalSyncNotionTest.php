@@ -53,7 +53,11 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
 
-        $event = (object) ['id' => 'event-1'];
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Board Meeting',
+            'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
+        ];
 
         NotionModelFake::$upcomingEventsReturn = collect();
         NotionModelFake::$collectionsReturn = [
@@ -83,9 +87,15 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             $rendered = $mail->render();
 
             return $mail->subject === 'Notion同期レポート'
-                && in_array('Personal Label: 1件', $mail->summaryLines, true)
+                && $mail->totals === ['Personal Label' => 1]
+                && $mail->details === [
+                    'Personal Label' => [
+                        ['start' => '2024-05-10 09:00', 'summary' => 'Board Meeting'],
+                    ],
+                ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Personal Label: 1件')
+                && str_contains($rendered, '  - 2024-05-10 09:00 Board Meeting')
                 && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
         });
     }
@@ -124,7 +134,11 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
 
-        $event = (object) ['id' => 'holiday-event'];
+        $event = (object) [
+            'id' => 'holiday-event',
+            'summary' => '敬老の日',
+            'start' => (object) ['date' => '2024-09-15'],
+        ];
 
         NotionModelFake::$collectionsReturn = [
             'holiday-event' => collect(),
@@ -153,9 +167,15 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             $rendered = $mail->render();
 
             return $mail->subject === 'Notion同期レポート'
-                && in_array('Holiday Label: 1件', $mail->summaryLines, true)
+                && $mail->totals === ['Holiday Label' => 1]
+                && $mail->details === [
+                    'Holiday Label' => [
+                        ['start' => '2024-09-15', 'summary' => '敬老の日'],
+                    ],
+                ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Holiday Label: 1件')
+                && str_contains($rendered, '  - 2024-09-15 敬老の日')
                 && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
         });
     }

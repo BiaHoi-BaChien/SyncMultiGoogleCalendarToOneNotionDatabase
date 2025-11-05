@@ -11,18 +11,25 @@ class SyncReportMail extends Mailable
     use Queueable, SerializesModels;
 
     /**
-     * @var array<int, string>
+     * @var array<string, int>
      */
-    public array $summaryLines;
+    public array $totals;
+
+    /**
+     * @var array<string, array<int, array{start: string, summary: string}>>
+     */
+    public array $details;
 
     /**
      * Create a new message instance.
      *
-     * @param array<int, string> $summaryLines
+     * @param array<string, int> $totals
+     * @param array<string, array<int, array{start: string, summary: string}>> $details
      */
-    public function __construct(array $summaryLines)
+    public function __construct(array $totals, array $details)
     {
-        $this->summaryLines = $summaryLines;
+        $this->totals = $totals;
+        $this->details = $details;
     }
 
     /**
@@ -32,7 +39,27 @@ class SyncReportMail extends Mailable
      */
     public function build()
     {
-        $body = implode(PHP_EOL, $this->summaryLines) . PHP_EOL . '以上の予定をNotionデータベースに同期しました。';
+        $lines = [];
+
+        foreach ($this->totals as $label => $count) {
+            $lines[] = sprintf('%s: %d件', $label, $count);
+
+            $events = $this->details[$label] ?? [];
+            foreach ($events as $event) {
+                $start = $event['start'];
+                $summary = $event['summary'];
+                $detail = trim(trim($start) . ' ' . trim($summary));
+                if ($detail === '') {
+                    $detail = '(詳細なし)';
+                }
+
+                $lines[] = sprintf('  - %s', $detail);
+            }
+        }
+
+        $lines[] = '以上の予定をNotionデータベースに同期しました。';
+
+        $body = implode(PHP_EOL, $lines);
 
         return $this
             ->subject('Notion同期レポート')
