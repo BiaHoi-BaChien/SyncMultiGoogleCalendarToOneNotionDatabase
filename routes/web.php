@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+// use Illuminate\Support\Facades\Route;
 // use App\Http\Controllers\GoogleCalendarController;
 /*
 |--------------------------------------------------------------------------
@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::view('/', 'welcome');
+// Route::get('/', function () {
+//     return view('welcome');
+// });
 
 // Route::get('/calendar', [GoogleCalendarController::class, 'index']);
