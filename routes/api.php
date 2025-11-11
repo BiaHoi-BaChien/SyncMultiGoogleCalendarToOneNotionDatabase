@@ -1,11 +1,19 @@
 <?php
 
-use App\Http\Controllers\Auth\PasskeyController;
-use Illuminate\Support\Facades\Route;
+// use Illuminate\Http\Request;
+// use Illuminate\Support\Facades\Route;
 
-Route::prefix('passkeys')->group(function () {
-    Route::post('registration/challenge', [PasskeyController::class, 'createRegistrationChallenge']);
-    Route::post('registration/finish', [PasskeyController::class, 'finishRegistration']);
-    Route::post('login/challenge', [PasskeyController::class, 'createLoginChallenge']);
-    Route::post('login/finish', [PasskeyController::class, 'finishLogin']);
-});
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| is assigned the "api" middleware group. Enjoy building your API!
+|
+*/
+
+// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//     return $request->user();
+// });
