@@ -101,6 +101,35 @@ SYNC_MAX_DAYS=90
 
 タイムゾーンを変更したい場合は `.env` の `TIMEZONE` を編集してください（未設定時のデフォルトは `Asia/Ho_Chi_Minh`）。
 
+### パスキー認証 API
+
+本リポジトリには、WebAuthn パスキーを利用して API ログインするためのエンドポイントが含まれています。`.env` では次の値を調整できます。
+
+| 変数名 | 役割 |
+| --- | --- |
+| `PASSKEY_RP_ID` | WebAuthn の RP ID（通常はフロントエンドをホストするドメイン名） |
+| `PASSKEY_ORIGIN` | ブラウザから送信されるリクエストのオリジン検証に利用する URL |
+| `PASSKEY_CHALLENGE_TTL` | 認証チャレンジの有効期限（秒） |
+
+API ルートは `routes/api.php` に登録されています。フロントエンドからの典型的なフローは以下のとおりです。
+
+1. `POST /api/passkeys/registration/challenge`
+   - ボディ: `{ "userHandle": "user@example.com", "displayName": "表示名" }`
+   - レスポンス: WebAuthn `navigator.credentials.create` にそのまま渡せる `publicKey` オブジェクトと `challengeId`。
+2. `POST /api/passkeys/registration/finish`
+   - ボディ: `{ "challengeId": "...", "credential": { ... } }`
+   - フロントエンドで取得した Credential オブジェクトを JSON 化して送信すると、公開鍵と署名カウンタが保存されます。
+3. `POST /api/passkeys/login/challenge`
+   - ボディ: `{ "userHandle": "user@example.com" }`
+   - レスポンス: `navigator.credentials.get` 向けの `publicKey` オプションと `challengeId`。
+4. `POST /api/passkeys/login/finish`
+   - ボディ: `{ "challengeId": "...", "credential": { ... } }`
+   - 署名が検証されると 200 OK でログイン完了。レスポンスには `credentialId` と `userHandle` が含まれます。
+
+現在は ES256 (P-256) の公開鍵のみをサポートしています。他のアルゴリズムを利用したい場合は `App\Services\Passkey\CoseKey` を拡張してください。
+
+> **Note:** パスキー機能を利用する前に `php artisan migrate` を実行し、`passkey_credentials` テーブルを作成してください。
+
 ### 6. Google サービスアカウントキーの配置
 
 ダウンロードした JSON キーを `storage/app/json/` に配置します。
