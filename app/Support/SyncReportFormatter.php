@@ -26,7 +26,7 @@ class SyncReportFormatter
 
                 $action = $event['action'] ?? '';
                 if ($action !== '') {
-                    $lines[] = sprintf('  - %s：%s', $action, $detail);
+                    $lines[] = sprintf('  - %s ) %s', $action, $detail);
                     continue;
                 }
 
