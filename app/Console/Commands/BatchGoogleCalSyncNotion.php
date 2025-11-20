@@ -82,10 +82,7 @@ class BatchGoogleCalSyncNotion extends Command
             $deleteNotionTasks = true;
         }
 
-        $syncCounts = [];
-        foreach (array_keys($calendar_list) as $key) {
-            $syncCounts[$key] = 0;
-        }
+        $syncCountsByLabel = [];
         $syncDetails = [];
 
         $notions = new NotionModel;
@@ -158,14 +155,15 @@ class BatchGoogleCalSyncNotion extends Command
                 }
 
                 if ($registered) {
-                    $syncCounts[$key]++;
-
                     $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
+
+                    $syncCountsByLabel[$calendarLabel] = ($syncCountsByLabel[$calendarLabel] ?? 0) + 1;
                     if (!array_key_exists($calendarLabel, $syncDetails)) {
                         $syncDetails[$calendarLabel] = [];
                     }
 
                     $syncDetails[$calendarLabel][] = [
+                        'action' => '追加',
                         'start' => $this->formatEventStart($event),
                         'summary' => isset($event->summary) ? (string) $event->summary : '',
                     ];
@@ -202,6 +200,19 @@ class BatchGoogleCalSyncNotion extends Command
                 }
 
                 if (!$existsInGoogleCalendar) {
+                    $label = $this->extractNotionLabel($notionEvent);
+                    $syncCountsByLabel[$label] = ($syncCountsByLabel[$label] ?? 0) + 1;
+
+                    if (!array_key_exists($label, $syncDetails)) {
+                        $syncDetails[$label] = [];
+                    }
+
+                    $syncDetails[$label][] = [
+                        'action' => '削除',
+                        'start' => $this->formatNotionEventStart($notionEvent),
+                        'summary' => $this->extractNotionSummary($notionEvent),
+                    ];
+
                     try {
                         $notions->deleteNotionEvent($notionEvent['id']);
                     } catch (\Exception $e) {
@@ -211,19 +222,10 @@ class BatchGoogleCalSyncNotion extends Command
                 }
             }
         }
-        $totalSynced = array_sum($syncCounts);
+        $totalSynced = array_sum($syncCountsByLabel);
 
         if ($totalSynced > 0) {
-            $totals = [];
-            foreach ($calendar_list as $key => $calendar) {
-                $count = $syncCounts[$key] ?? 0;
-                if ($count <= 0) {
-                    continue;
-                }
-
-                $label = $calendar['notion_label'] ?? $key;
-                $totals[$label] = $count;
-            }
+            $totals = $syncCountsByLabel;
 
             if (!empty($totals)) {
                 $bodyText = SyncReportFormatter::formatText($totals, $syncDetails);
@@ -276,5 +278,45 @@ class BatchGoogleCalSyncNotion extends Command
         }
 
         return '';
+    }
+
+    private function extractNotionLabel(array $notionEvent): string
+    {
+        $label = '';
+
+        $genre = $notionEvent['properties']['ジャンル']['multi_select'][0]['name'] ?? null;
+        if (is_string($genre) && $genre !== '') {
+            $label = $genre;
+        }
+
+        if ($label === '') {
+            $label = 'その他';
+        }
+
+        return $label;
+    }
+
+    private function extractNotionSummary(array $notionEvent): string
+    {
+        $title = $notionEvent['properties']['Name']['title'][0]['plain_text'] ?? null;
+
+        return is_string($title) ? $title : '';
+    }
+
+    private function formatNotionEventStart(array $notionEvent): string
+    {
+        $start = $notionEvent['properties']['Date']['date']['start'] ?? null;
+        if (!is_string($start) || $start === '') {
+            return '';
+        }
+
+        try {
+            $dateTime = new \DateTime($start, new \DateTimeZone(config('app.timezone')));
+            $hasTime = str_contains($start, 'T');
+
+            return $dateTime->format($hasTime ? 'Y-m-d H:i' : 'Y-m-d');
+        } catch (\Exception $e) {
+            return $start;
+        }
     }
 }

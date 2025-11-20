@@ -6,7 +6,7 @@ class SyncReportFormatter
 {
     /**
      * @param array<string, int> $totals
-     * @param array<string, array<int, array{start: string, summary: string}>> $details
+     * @param array<string, array<int, array{action?: string, start: string, summary: string}>> $details
      */
     public static function formatText(array $totals, array $details): string
     {
@@ -22,6 +22,12 @@ class SyncReportFormatter
                 $detail = trim(trim((string) $start) . ' ' . trim((string) $summary));
                 if ($detail === '') {
                     $detail = '(詳細なし)';
+                }
+
+                $action = $event['action'] ?? '';
+                if ($action !== '') {
+                    $lines[] = sprintf('  - %s：%s', $action, $detail);
+                    continue;
                 }
 
                 $lines[] = sprintf('  - %s', $detail);
