@@ -153,6 +153,60 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         });
     }
 
+    public function test_sync_report_special_characters_are_not_escaped_for_slack_or_mail(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+        config()->set('app.slack_bot_enabled', true);
+        config()->set('app.slack_bot_token', 'xoxb-test-token');
+        config()->set('app.slack_dm_user_ids', 'U0123456789');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'R&D & QA <Review>',
+            'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect();
+        NotionModelFake::$collectionsReturn = [
+            'event-1' => collect(),
+        ];
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        Http::fake([
+            'https://slack.com/api/chat.postMessage' => Http::response([
+                'ok' => true,
+                'ts' => '1714976400.000100',
+            ]),
+        ]);
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://slack.com/api/chat.postMessage'
+                && $request['channel'] === 'U0123456789'
+                && $request['text'] === "Personal Label: 1件\n  - 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
+        });
+
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
+            $mail->build();
+
+            $rendered = $mail->render();
+
+            return str_contains($rendered, 'R&D & QA <Review>')
+                && !str_contains($rendered, 'R&amp;D &amp; QA &lt;Review&gt;');
+        });
+    }
+
     public function test_command_skips_mail_when_only_existing_events(): void
     {
         $this->setDefaultCalendarConfig();
