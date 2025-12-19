@@ -82,8 +82,8 @@ class BatchGoogleCalSyncNotion extends Command
             $deleteNotionTasks = true;
         }
 
-        $syncCountsByLabel = [];
-        $syncDetails = [];
+        $createdCountsByLabel = [];
+        $createdDetails = [];
 
         $notions = new NotionModel;
 
@@ -157,13 +157,12 @@ class BatchGoogleCalSyncNotion extends Command
                 if ($registered) {
                     $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
 
-                    $syncCountsByLabel[$calendarLabel] = ($syncCountsByLabel[$calendarLabel] ?? 0) + 1;
-                    if (!array_key_exists($calendarLabel, $syncDetails)) {
-                        $syncDetails[$calendarLabel] = [];
+                    $createdCountsByLabel[$calendarLabel] = ($createdCountsByLabel[$calendarLabel] ?? 0) + 1;
+                    if (!array_key_exists($calendarLabel, $createdDetails)) {
+                        $createdDetails[$calendarLabel] = [];
                     }
 
-                    $syncDetails[$calendarLabel][] = [
-                        'action' => '追加',
+                    $createdDetails[$calendarLabel][] = [
                         'start' => $this->formatEventStart($event),
                         'summary' => isset($event->summary) ? (string) $event->summary : '',
                     ];
@@ -200,19 +199,6 @@ class BatchGoogleCalSyncNotion extends Command
                 }
 
                 if (!$existsInGoogleCalendar) {
-                    $label = $this->extractNotionLabel($notionEvent);
-                    $syncCountsByLabel[$label] = ($syncCountsByLabel[$label] ?? 0) + 1;
-
-                    if (!array_key_exists($label, $syncDetails)) {
-                        $syncDetails[$label] = [];
-                    }
-
-                    $syncDetails[$label][] = [
-                        'action' => '削除',
-                        'start' => $this->formatNotionEventStart($notionEvent),
-                        'summary' => $this->extractNotionSummary($notionEvent),
-                    ];
-
                     try {
                         $notions->deleteNotionEvent($notionEvent['id']);
                     } catch (\Exception $e) {
@@ -222,13 +208,13 @@ class BatchGoogleCalSyncNotion extends Command
                 }
             }
         }
-        $totalSynced = array_sum($syncCountsByLabel);
+        $totalCreated = array_sum($createdCountsByLabel);
 
-        if ($totalSynced > 0) {
-            $totals = $syncCountsByLabel;
+        if ($totalCreated > 0) {
+            $totals = $createdCountsByLabel;
 
             if (!empty($totals)) {
-                $bodyText = SyncReportFormatter::formatText($totals, $syncDetails);
+                $bodyText = SyncReportFormatter::formatText($totals, $createdDetails);
 
                 $slackNotifier = new SlackNotifier();
                 $slackMessages = [];
@@ -243,7 +229,7 @@ class BatchGoogleCalSyncNotion extends Command
 
                 if (!empty($mailTo)) {
                     try {
-                        Mail::to($mailTo)->send(new SyncReportMail($totals, $syncDetails));
+                        Mail::to($mailTo)->send(new SyncReportMail($totals, $createdDetails));
                     } catch (\Throwable $e) {
                         $slackNotifier->notifyError($slackMessages ?? [], $e);
                         report($e);
