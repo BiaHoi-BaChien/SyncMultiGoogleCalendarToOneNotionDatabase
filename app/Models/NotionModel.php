@@ -77,19 +77,35 @@ class NotionModel extends Model
      * 指定したGoogleカレンダーIDに対応するNotionのコレクションを取得する
      *
      * @param string $googleCalendarId
+     * @param string $notionLabel
      * @return \Illuminate\Support\Collection
      */
-    public function getCollectionsFromNotion(string $googleCalendarId)
+    public function getCollectionsFromNotion(string $googleCalendarId, string $notionLabel)
     {
         $dataSourceId = $this->getDataSourceId();
+
+        $filters = [
+            [
+                'property' => 'googleCalendarId',
+                'rich_text' => [
+                    'equals' => $googleCalendarId,
+                ],
+            ],
+        ];
+
+        if ($notionLabel !== '') {
+            $filters[] = [
+                'property' => 'ジャンル',
+                'multi_select' => [
+                    'contains' => $notionLabel,
+                ],
+            ];
+        }
 
         $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
             'json' => [
                 'filter' => [
-                    'property' => 'googleCalendarId',
-                    'rich_text' => [
-                        'equals' => $googleCalendarId,
-                    ],
+                    'and' => $filters,
                 ],
             ],
         ]);

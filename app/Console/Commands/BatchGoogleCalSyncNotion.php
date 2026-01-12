@@ -90,7 +90,7 @@ class BatchGoogleCalSyncNotion extends Command
         // 設定値(sync_max_days)に従い同期対象の日付を取得
         $targetDateStart = (string)date("Y-m-d");
         $targetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
-        
+
         // 除外するジャンルのラベルを取得
         $excludeLabels = array_column($holidayCalendarList, 'notion_label');
 
@@ -103,7 +103,7 @@ class BatchGoogleCalSyncNotion extends Command
                 return Command::FAILURE;
             }
         }
-        
+
         // 各Google Calenterから指定範囲のイベントを取得
         foreach (array_keys($calendar_list) as $key){
             if(empty($calendar_list[$key]['calendar_id'])){
@@ -134,7 +134,10 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // このイベントがNotionに登録されているか検索
                 try{
-                    $collections = $notions->getCollectionsFromNotion($event->id);
+                    $collections = $notions->getCollectionsFromNotion(
+                        $event->id,
+                        (string) ($calendar_list[$key]['notion_label'] ?? '')
+                    );
                 }catch(\Exception $e){
                     report($e);
                     return Command::FAILURE;
@@ -172,10 +175,8 @@ class BatchGoogleCalSyncNotion extends Command
             // 祝日カレンダーの場合は削除しない
             if ($deleteNotionTasks) {
                 $targetLabel = $calendar_list[$key]['notion_label'] ?? '';
-                $filteredNotionEvents = array_filter(
-                    $notionEvents ?? [],
-                    fn (array $notionEvent) => $this->extractNotionLabel($notionEvent) === $targetLabel
-                );
+                $filteredNotionEvents = collect($notionEvents)
+                    ->filter(fn (array $notionEvent) => $this->extractNotionLabel($notionEvent) === $targetLabel);
 
                 foreach ($filteredNotionEvents as $notionEvent) {
                     $googleCalendarId = null;
