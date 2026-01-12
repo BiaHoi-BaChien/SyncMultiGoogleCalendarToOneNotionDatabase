@@ -17,7 +17,7 @@ class SyncReportMail extends Mailable
     public array $totals;
 
     /**
-     * @var array<string, array<int, array{start: string, summary: string}>>
+     * @var array<string, array<int, array{action?: string, start: string, summary: string}>>
      */
     public array $details;
 
@@ -25,7 +25,7 @@ class SyncReportMail extends Mailable
      * Create a new message instance.
      *
      * @param array<string, int> $totals
-     * @param array<string, array<int, array{start: string, summary: string}>> $details
+     * @param array<string, array<int, array{action?: string, start: string, summary: string}>> $details
      */
     public function __construct(array $totals, array $details)
     {
