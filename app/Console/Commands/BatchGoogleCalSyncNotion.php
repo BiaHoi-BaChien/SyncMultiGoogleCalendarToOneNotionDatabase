@@ -111,6 +111,7 @@ class BatchGoogleCalSyncNotion extends Command
             }
 
             $googleEventIds = [];
+            $googleEventStartsById = [];
             $events = [];
             $googlecal = new GoogleCalendarModel;
 
@@ -131,6 +132,7 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // イベントIDを配列に格納
                 $googleEventIds[] = $event->id;
+                $googleEventStartsById[$event->id] = $this->formatEventStart($event);
 
                 // このイベントがNotionに登録されているか検索
                 try{
@@ -196,7 +198,11 @@ class BatchGoogleCalSyncNotion extends Command
                         continue;
                     }
 
-                    if (!in_array($googleCalendarId, $googleEventIds, true)) {
+                    $googleEventStart = $googleEventStartsById[$googleCalendarId] ?? null;
+                    $notionEventStart = $this->formatNotionEventStart($notionEvent);
+
+                    if (!in_array($googleCalendarId, $googleEventIds, true)
+                        || $googleEventStart !== $notionEventStart) {
                         try {
                             $notions->deleteNotionEvent($notionEvent['id']);
                         } catch (\Exception $e) {
