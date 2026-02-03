@@ -202,7 +202,11 @@ class NotionModel extends Model
      */
     public function deleteNotionEvent(string $eventId)
     {
-        $response = $this->client->delete('blocks/' . $eventId);
+        $response = $this->client->patch('pages/' . $eventId, [
+            'json' => [
+                'archived' => true,
+            ],
+        ]);
 
         return $response->getStatusCode() === 200;
     }
