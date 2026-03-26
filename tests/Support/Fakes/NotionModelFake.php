@@ -35,7 +35,7 @@ class NotionModelFake
         return self::$upcomingEventsReturn;
     }
 
-    public function getCollectionsFromNotion(string $eventId)
+    public function getCollectionsFromNotion(string $eventId, string $notionLabel = '')
     {
         self::$getCollectionsCalls[] = $eventId;
 

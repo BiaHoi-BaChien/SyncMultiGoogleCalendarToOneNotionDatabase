@@ -80,33 +80,35 @@ class NotionModel extends Model
      * @param string $notionLabel
      * @return \Illuminate\Support\Collection
      */
-    public function getCollectionsFromNotion(string $googleCalendarId, string $notionLabel)
+    public function getCollectionsFromNotion(string $googleCalendarId, string $notionLabel = '')
     {
         $dataSourceId = $this->getDataSourceId();
-
-        $filters = [
-            [
-                'property' => 'googleCalendarId',
-                'rich_text' => [
-                    'equals' => $googleCalendarId,
-                ],
+        $googleCalendarFilter = [
+            'property' => 'googleCalendarId',
+            'rich_text' => [
+                'equals' => $googleCalendarId,
             ],
         ];
 
+        $filter = $googleCalendarFilter;
+
         if ($notionLabel !== '') {
-            $filters[] = [
-                'property' => 'ジャンル',
-                'multi_select' => [
-                    'contains' => $notionLabel,
+            $filter = [
+                'and' => [
+                    $googleCalendarFilter,
+                    [
+                        'property' => 'ジャンル',
+                        'multi_select' => [
+                            'contains' => $notionLabel,
+                        ],
+                    ],
                 ],
             ];
         }
 
         $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
             'json' => [
-                'filter' => [
-                    'and' => $filters,
-                ],
+                'filter' => $filter,
             ],
         ]);
 

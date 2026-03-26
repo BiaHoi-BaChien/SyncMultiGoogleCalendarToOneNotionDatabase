@@ -82,8 +82,8 @@ class BatchGoogleCalSyncNotion extends Command
             $deleteNotionTasks = true;
         }
 
-        $actionCountsByLabel = [];
-        $actionDetails = [];
+        $syncCountsByLabel = [];
+        $syncDetails = [];
 
         $notions = new NotionModel;
 
@@ -161,15 +161,14 @@ class BatchGoogleCalSyncNotion extends Command
                 if ($registered) {
                     $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
 
-                    $actionCountsByLabel[$calendarLabel] = ($actionCountsByLabel[$calendarLabel] ?? 0) + 1;
-                    if (!array_key_exists($calendarLabel, $actionDetails)) {
-                        $actionDetails[$calendarLabel] = [];
+                    $syncCountsByLabel[$calendarLabel] = ($syncCountsByLabel[$calendarLabel] ?? 0) + 1;
+                    if (!array_key_exists($calendarLabel, $syncDetails)) {
+                        $syncDetails[$calendarLabel] = [];
                     }
 
-                    $actionDetails[$calendarLabel][] = [
+                    $syncDetails[$calendarLabel][] = [
                         'start' => $this->formatEventStart($event),
                         'summary' => isset($event->summary) ? (string) $event->summary : '',
-                        'action' => '追加',
                     ];
                 }
             }
@@ -179,7 +178,11 @@ class BatchGoogleCalSyncNotion extends Command
             if ($deleteNotionTasks) {
                 $targetLabel = $calendar_list[$key]['notion_label'] ?? '';
                 $filteredNotionEvents = collect($notionEvents)
-                    ->filter(fn (array $notionEvent) => $this->extractNotionLabel($notionEvent) === $targetLabel);
+                    ->filter(function (array $notionEvent) use ($targetLabel) {
+                        $label = $this->extractNotionLabel($notionEvent);
+
+                        return $label === '' || $label === $targetLabel;
+                    });
 
                 foreach ($filteredNotionEvents as $notionEvent) {
                     $googleCalendarId = null;
@@ -209,30 +212,18 @@ class BatchGoogleCalSyncNotion extends Command
                             report($e);
                             return Command::FAILURE;
                         }
-
-                        $calendarLabel = $this->extractNotionLabel($notionEvent);
-                        $actionCountsByLabel[$calendarLabel] = ($actionCountsByLabel[$calendarLabel] ?? 0) + 1;
-                        if (!array_key_exists($calendarLabel, $actionDetails)) {
-                            $actionDetails[$calendarLabel] = [];
-                        }
-
-                        $actionDetails[$calendarLabel][] = [
-                            'start' => $this->formatNotionEventStart($notionEvent),
-                            'summary' => $this->extractNotionSummary($notionEvent),
-                            'action' => '削除',
-                        ];
                     }
                 }
             }
         }
 
-        $totalActions = array_sum($actionCountsByLabel);
+        $totalActions = array_sum($syncCountsByLabel);
 
         if ($totalActions > 0) {
-            $totals = $actionCountsByLabel;
+            $totals = $syncCountsByLabel;
 
             if (!empty($totals)) {
-                $bodyText = SyncReportFormatter::formatText($totals, $actionDetails);
+                $bodyText = SyncReportFormatter::formatText($totals, $syncDetails);
 
                 $slackNotifier = new SlackNotifier();
                 $slackMessages = [];
@@ -247,7 +238,7 @@ class BatchGoogleCalSyncNotion extends Command
 
                 if (!empty($mailTo)) {
                     try {
-                        Mail::to($mailTo)->send(new SyncReportMail($totals, $actionDetails));
+                        Mail::to($mailTo)->send(new SyncReportMail($totals, $syncDetails));
                     } catch (\Throwable $e) {
                         $slackNotifier->notifyError($slackMessages ?? [], $e);
                         report($e);
@@ -286,18 +277,9 @@ class BatchGoogleCalSyncNotion extends Command
 
     private function extractNotionLabel(array $notionEvent): string
     {
-        $label = '';
-
         $genre = $notionEvent['properties']['ジャンル']['multi_select'][0]['name'] ?? null;
-        if (is_string($genre) && $genre !== '') {
-            $label = $genre;
-        }
 
-        if ($label === '') {
-            $label = 'その他';
-        }
-
-        return $label;
+        return is_string($genre) ? $genre : '';
     }
 
     private function extractNotionSummary(array $notionEvent): string
