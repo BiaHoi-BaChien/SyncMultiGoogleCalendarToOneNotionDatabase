@@ -139,7 +139,7 @@ class NotionModelHttpTest extends TestCase
         $this->assertFalse($result);
     }
 
-    public function test_delete_notion_event_sends_delete_request_and_returns_true_on_success(): void
+    public function test_delete_notion_event_sends_archive_patch_request_and_returns_true_on_success(): void
     {
         $history = [];
         $model = $this->createModelWithMockHandler([
@@ -152,8 +152,11 @@ class NotionModelHttpTest extends TestCase
         $this->assertCount(1, $history);
 
         $request = $history[0]['request'];
-        $this->assertSame('DELETE', $request->getMethod());
-        $this->assertSame('/v1/blocks/notion-event-id', $request->getUri()->getPath());
+        $this->assertSame('PATCH', $request->getMethod());
+        $this->assertSame('/v1/pages/notion-event-id', $request->getUri()->getPath());
+
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertSame(['archived' => true], $body);
     }
 
     private function createModelWithMockHandler(array $responses, array &$history): NotionModel
@@ -201,3 +204,4 @@ class NotionModelHttpTest extends TestCase
         return $event;
     }
 }
+
