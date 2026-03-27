@@ -24,4 +24,21 @@ class SyncReportFormatterTest extends TestCase
         $this->assertStringContainsString('  - (追加) 2026-01-01 09:00 定例会議', $text);
         $this->assertStringNotContainsString('  - 追加 ) 2026-01-01 09:00 定例会議', $text);
     }
+
+    public function test_format_text_displays_delete_action_with_parentheses(): void
+    {
+        $text = SyncReportFormatter::formatText([
+            '個人' => 1,
+        ], [
+            '個人' => [
+                [
+                    'action' => '削除',
+                    'start' => '2026-01-02 10:00',
+                    'summary' => '不要な予定',
+                ],
+            ],
+        ]);
+
+        $this->assertStringContainsString('  - (削除) 2026-01-02 10:00 不要な予定', $text);
+    }
 }
