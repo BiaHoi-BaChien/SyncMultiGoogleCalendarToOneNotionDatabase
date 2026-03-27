@@ -83,6 +83,7 @@ class BatchGoogleCalSyncNotion extends Command
         }
 
         $syncCountsByLabel = [];
+        $deleteCountsByLabel = [];
         $syncDetails = [];
 
         $notions = new NotionModel;
@@ -207,20 +208,37 @@ class BatchGoogleCalSyncNotion extends Command
                     if (!in_array($googleCalendarId, $googleEventIds, true)
                         || $googleEventStart !== $notionEventStart) {
                         try {
-                            $notions->deleteNotionEvent($notionEvent['id']);
+                            $deleted = $notions->deleteNotionEvent($notionEvent['id']);
                         } catch (\Exception $e) {
                             report($e);
                             return Command::FAILURE;
+                        }
+
+                        if ($deleted) {
+                            $calendarLabel = $targetLabel !== '' ? $targetLabel : ($key ?? '');
+                            $deleteCountsByLabel[$calendarLabel] = ($deleteCountsByLabel[$calendarLabel] ?? 0) + 1;
+                            if (!array_key_exists($calendarLabel, $syncDetails)) {
+                                $syncDetails[$calendarLabel] = [];
+                            }
+
+                            $syncDetails[$calendarLabel][] = [
+                                'action' => '削除',
+                                'start' => $notionEventStart,
+                                'summary' => $this->extractNotionSummary($notionEvent),
+                            ];
                         }
                     }
                 }
             }
         }
 
-        $totalActions = array_sum($syncCountsByLabel);
+        $totalActions = array_sum($syncCountsByLabel) + array_sum($deleteCountsByLabel);
 
         if ($totalActions > 0) {
-            $totals = $syncCountsByLabel;
+            $totals = [];
+            foreach (array_unique(array_merge(array_keys($syncCountsByLabel), array_keys($deleteCountsByLabel))) as $label) {
+                $totals[$label] = ($syncCountsByLabel[$label] ?? 0) + ($deleteCountsByLabel[$label] ?? 0);
+            }
 
             if (!empty($totals)) {
                 $bodyText = SyncReportFormatter::formatText($totals, $syncDetails);

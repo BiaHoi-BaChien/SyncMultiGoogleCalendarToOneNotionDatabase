@@ -296,6 +296,21 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             [
                 'id' => 'notion-event-1',
                 'properties' => [
+                    'ジャンル' => [
+                        'multi_select' => [
+                            ['name' => 'Personal Label'],
+                        ],
+                    ],
+                    'Name' => [
+                        'title' => [
+                            ['plain_text' => 'Stale Notion Event'],
+                        ],
+                    ],
+                    'Date' => [
+                        'date' => [
+                            'start' => '2024-05-11T10:00:00+09:00',
+                        ],
+                    ],
                     'googleCalendarId' => [
                         'rich_text' => [
                             [
@@ -327,8 +342,25 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertSame(['event-existing'], NotionModelFake::$getCollectionsCalls);
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-1'], NotionModelFake::$deleteCalls);
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
+            $mail->build();
 
-        Mail::assertNothingSent();
+            $rendered = $mail->render();
+
+            return $mail->totals === ['Personal Label' => 1]
+                && $mail->details === [
+                    'Personal Label' => [
+                        [
+                            'action' => '削除',
+                            'start' => '2024-05-11 10:00',
+                            'summary' => 'Stale Notion Event',
+                        ],
+                    ],
+                ]
+                && is_string($rendered)
+                && str_contains($rendered, 'Personal Label: 1件')
+                && str_contains($rendered, '  - (削除) 2024-05-11 10:00 Stale Notion Event');
+        });
     }
 
     public function test_command_skips_notion_events_when_google_calendar_id_missing(): void
