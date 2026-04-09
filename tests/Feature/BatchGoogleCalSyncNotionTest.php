@@ -97,12 +97,12 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 && $mail->totals === ['Personal Label' => 1]
                 && $mail->details === [
                     'Personal Label' => [
-                        ['start' => '2024-05-10 09:00', 'summary' => 'Board Meeting'],
+                        ['action' => '追加', 'start' => '2024-05-10 09:00', 'summary' => 'Board Meeting'],
                     ],
                 ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Personal Label: 1件')
-                && str_contains($rendered, '  - 2024-05-10 09:00 Board Meeting')
+                && str_contains($rendered, '  - (追加) 2024-05-10 09:00 Board Meeting')
                 && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
         });
     }
@@ -149,7 +149,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Http::assertSent(function ($request) {
             return $request->url() === 'https://slack.com/api/chat.postMessage'
                 && $request['channel'] === 'U0123456789'
-                && $request['text'] === "Personal Label: 1件\n  - 2024-05-10 09:00 Board Meeting\n以上の予定をNotionデータベースに同期しました。";
+                && $request['text'] === "Personal Label: 1件\n  - (追加) 2024-05-10 09:00 Board Meeting\n以上の予定をNotionデータベースに同期しました。";
         });
     }
 
@@ -194,7 +194,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Http::assertSent(function ($request) {
             return $request->url() === 'https://slack.com/api/chat.postMessage'
                 && $request['channel'] === 'U0123456789'
-                && $request['text'] === "Personal Label: 1件\n  - 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
+                && $request['text'] === "Personal Label: 1件\n  - (追加) 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
         });
 
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
@@ -277,12 +277,12 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 && $mail->totals === ['Holiday Label' => 1]
                 && $mail->details === [
                     'Holiday Label' => [
-                        ['start' => '2024-09-15', 'summary' => '敬老の日'],
+                        ['action' => '追加', 'start' => '2024-09-15', 'summary' => '敬老の日'],
                     ],
                 ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Holiday Label: 1件')
-                && str_contains($rendered, '  - 2024-09-15 敬老の日')
+                && str_contains($rendered, '  - (追加) 2024-09-15 敬老の日')
                 && str_contains($rendered, '以上の予定をNotionデータベースに同期しました。');
         });
     }

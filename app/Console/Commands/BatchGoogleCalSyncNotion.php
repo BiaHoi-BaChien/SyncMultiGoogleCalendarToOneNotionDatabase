@@ -168,6 +168,7 @@ class BatchGoogleCalSyncNotion extends Command
                     }
 
                     $syncDetails[$calendarLabel][] = [
+                        'action' => '追加',
                         'start' => $this->formatEventStart($event),
                         'summary' => isset($event->summary) ? (string) $event->summary : '',
                     ];
