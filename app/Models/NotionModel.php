@@ -158,16 +158,30 @@ class NotionModel extends Model
 
         $dataSourceId = $this->getDataSourceId();
 
-        $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
-            'json' => [
+        $results = [];
+        $startCursor = null;
+
+        do {
+            $payload = [
                 'filter' => [
                     'and' => $filters,
                 ],
-            ],
-        ]);
+            ];
 
-        $data = json_decode($response->getBody(), true);
-        return collect($data['results']);
+            if ($startCursor !== null) {
+                $payload['start_cursor'] = $startCursor;
+            }
+
+            $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
+                'json' => $payload,
+            ]);
+
+            $data = json_decode($response->getBody(), true);
+            $results = array_merge($results, $data['results'] ?? []);
+            $startCursor = $data['next_cursor'] ?? null;
+        } while (($data['has_more'] ?? false) && $startCursor !== null);
+
+        return collect($results);
     }
 
     /**

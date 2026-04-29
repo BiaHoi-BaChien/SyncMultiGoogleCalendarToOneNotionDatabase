@@ -62,9 +62,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         ];
 
         NotionModelFake::$upcomingEventsReturn = collect();
-        NotionModelFake::$collectionsReturn = [
-            'event-1' => collect(),
-        ];
         NotionModelFake::$registResults = [
             'event-1' => true,
         ];
@@ -84,7 +81,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertSame([
             [$expectedStart, $expectedEnd, ['Holiday Label']],
         ], NotionModelFake::$getUpcomingArgs);
-        $this->assertSame(['event-1'], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
@@ -122,9 +119,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         ];
 
         NotionModelFake::$upcomingEventsReturn = collect();
-        NotionModelFake::$collectionsReturn = [
-            'event-1' => collect(),
-        ];
         NotionModelFake::$registResults = [
             'event-1' => true,
         ];
@@ -168,9 +162,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         ];
 
         NotionModelFake::$upcomingEventsReturn = collect();
-        NotionModelFake::$collectionsReturn = [
-            'event-1' => collect(),
-        ];
         NotionModelFake::$registResults = [
             'event-1' => true,
         ];
@@ -214,10 +205,28 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $event = (object) ['id' => 'event-1'];
 
-        NotionModelFake::$upcomingEventsReturn = collect();
-        NotionModelFake::$collectionsReturn = [
-            'event-1' => collect(['existing']),
-        ];
+        NotionModelFake::$upcomingEventsReturn = collect([
+            [
+                'id' => 'notion-event-1',
+                'properties' => [
+                    'ジャンル' => [
+                        'multi_select' => [
+                            ['name' => 'Other Label'],
+                            ['name' => 'Personal Label'],
+                        ],
+                    ],
+                    'googleCalendarId' => [
+                        'rich_text' => [
+                            [
+                                'text' => [
+                                    'content' => 'event-1',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
 
         GoogleCalendarModelFake::$eventLists = [
             'calendar-personal' => [$event],
@@ -229,7 +238,163 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
-        $this->assertSame(['event-1'], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_command_adds_new_event_and_deletes_old_event_when_start_changes(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Test',
+            'start' => (object) ['dateTime' => '2024-05-02T09:00:00+09:00'],
+            'end' => (object) ['dateTime' => '2024-05-02T10:00:00+09:00'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-old',
+                'event-1',
+                'Personal Label',
+                '2024-05-01T09:00:00+09:00',
+                '2024-05-01T10:00:00+09:00',
+                'Test'
+            ),
+        ]);
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame('event-1', NotionModelFake::$registCalls[0][0]->id);
+        $this->assertSame(['notion-event-old'], NotionModelFake::$deleteCalls);
+    }
+
+    public function test_command_adds_new_event_and_deletes_old_event_when_end_changes(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Test',
+            'start' => (object) ['dateTime' => '2024-05-01T09:00:00+09:00'],
+            'end' => (object) ['dateTime' => '2024-05-01T11:00:00+09:00'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-old',
+                'event-1',
+                'Personal Label',
+                '2024-05-01T09:00:00+09:00',
+                '2024-05-01T10:00:00+09:00',
+                'Test'
+            ),
+        ]);
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame('event-1', NotionModelFake::$registCalls[0][0]->id);
+        $this->assertSame(['notion-event-old'], NotionModelFake::$deleteCalls);
+    }
+
+    public function test_command_keeps_existing_all_day_multi_day_event_when_period_matches(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Trip',
+            'start' => (object) ['date' => '2024-05-01'],
+            'end' => (object) ['date' => '2024-05-04'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-existing',
+                'event-1',
+                'Personal Label',
+                '2024-05-01',
+                '2024-05-03',
+                'Trip'
+            ),
+        ]);
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_command_keeps_existing_all_day_single_day_event_when_period_matches(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Holiday',
+            'start' => (object) ['date' => '2024-05-01'],
+            'end' => (object) ['date' => '2024-05-02'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-existing',
+                'event-1',
+                'Personal Label',
+                '2024-05-01',
+                null,
+                'Holiday'
+            ),
+        ]);
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
@@ -247,9 +412,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             'start' => (object) ['date' => '2024-09-15'],
         ];
 
-        NotionModelFake::$collectionsReturn = [
-            'holiday-event' => collect(),
-        ];
         NotionModelFake::$registResults = [
             'holiday-event' => true,
         ];
@@ -263,8 +425,13 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion', ['mode' => 'holiday'])
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertSame(0, NotionModelFake::$getUpcomingCalls);
-        $this->assertSame(['holiday-event'], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
+        $expectedStart = date('Y-m-d');
+        $expectedEnd = date('Y-m-d');
+        $this->assertSame([
+            [$expectedStart, $expectedEnd, []],
+        ], NotionModelFake::$getUpcomingArgs);
+        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
@@ -325,12 +492,43 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         ]);
 
         NotionModelFake::$upcomingEventsReturn = $notionEvents;
-        NotionModelFake::$collectionsReturn = [
-            'event-existing' => collect(['existing']),
-        ];
+        $notionEvents->push([
+            'id' => 'notion-event-existing',
+            'properties' => [
+                'ジャンル' => [
+                    'multi_select' => [
+                        ['name' => 'Personal Label'],
+                    ],
+                ],
+                'Name' => [
+                    'title' => [
+                        ['plain_text' => 'Existing Notion Event'],
+                    ],
+                ],
+                'Date' => [
+                    'date' => [
+                        'start' => '2024-05-12T10:00:00+09:00',
+                    ],
+                ],
+                'googleCalendarId' => [
+                    'rich_text' => [
+                        [
+                            'text' => [
+                                'content' => 'event-existing',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
 
         GoogleCalendarModelFake::$eventLists = [
-            'calendar-personal' => [(object) ['id' => 'event-existing']],
+            'calendar-personal' => [
+                (object) [
+                    'id' => 'event-existing',
+                    'start' => (object) ['dateTime' => '2024-05-12T10:00:00+09:00'],
+                ],
+            ],
         ];
 
         Mail::fake();
@@ -339,7 +537,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
-        $this->assertSame(['event-existing'], NotionModelFake::$getCollectionsCalls);
+        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-1'], NotionModelFake::$deleteCalls);
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
@@ -411,5 +609,50 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $this->assertSame([], GoogleCalendarModelFake::$getListCalls);
         Mail::assertNothingSent();
+    }
+
+    private function makeNotionEvent(
+        string $pageId,
+        string $googleCalendarId,
+        string $label,
+        string $start,
+        ?string $end = null,
+        string $summary = ''
+    ): array {
+        $date = [
+            'start' => $start,
+        ];
+
+        if ($end !== null) {
+            $date['end'] = $end;
+        }
+
+        return [
+            'id' => $pageId,
+            'properties' => [
+                'ジャンル' => [
+                    'multi_select' => [
+                        ['name' => $label],
+                    ],
+                ],
+                'Name' => [
+                    'title' => [
+                        ['plain_text' => $summary],
+                    ],
+                ],
+                'Date' => [
+                    'date' => $date,
+                ],
+                'googleCalendarId' => [
+                    'rich_text' => [
+                        [
+                            'text' => [
+                                'content' => $googleCalendarId,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
     }
 }

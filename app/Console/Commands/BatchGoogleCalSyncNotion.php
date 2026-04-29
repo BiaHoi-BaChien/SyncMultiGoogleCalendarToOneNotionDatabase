@@ -96,14 +96,18 @@ class BatchGoogleCalSyncNotion extends Command
         $excludeLabels = array_column($holidayCalendarList, 'notion_label');
 
         // Notionに登録されている指定範囲のイベントを取得
-        if ($deleteNotionTasks) {
-            try {
-                $notionEvents = $notions->getUpcomingNotionEvents($targetDateStart, $targetDateEnd, $excludeLabels);
-            } catch (\Exception $e) {
-                report($e);
-                return Command::FAILURE;
-            }
+        try {
+            $notionEvents = $notions->getUpcomingNotionEvents(
+                $targetDateStart,
+                $targetDateEnd,
+                $deleteNotionTasks ? $excludeLabels : []
+            );
+        } catch (\Exception $e) {
+            report($e);
+            return Command::FAILURE;
         }
+
+        $registeredNotionEventIndex = $this->buildRegisteredNotionEventIndex($notionEvents);
 
         // 各Google Calenterから指定範囲のイベントを取得
         foreach (array_keys($calendar_list) as $key){
@@ -112,7 +116,7 @@ class BatchGoogleCalSyncNotion extends Command
             }
 
             $googleEventIds = [];
-            $googleEventStartsById = [];
+            $googleEventPeriodsById = [];
             $events = [];
             $googlecal = new GoogleCalendarModel;
 
@@ -133,21 +137,17 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // イベントIDを配列に格納
                 $googleEventIds[] = $event->id;
-                $googleEventStartsById[$event->id] = $this->formatEventStart($event);
-
-                // このイベントがNotionに登録されているか検索
-                try{
-                    $collections = $notions->getCollectionsFromNotion(
-                        $event->id,
-                        (string) ($calendar_list[$key]['notion_label'] ?? '')
-                    );
-                }catch(\Exception $e){
-                    report($e);
-                    return Command::FAILURE;
-                }
+                $googleEventPeriodsById[$event->id] = $this->formatEventPeriod($event);
+                $googleEventPeriod = $googleEventPeriodsById[$event->id];
 
                 // 既にNotionに登録されているのでスルー
-                if (count($collections)) {
+                if ($this->isRegisteredInNotion(
+                    $registeredNotionEventIndex,
+                    $event->id,
+                    (string) ($calendar_list[$key]['notion_label'] ?? ''),
+                    $googleEventPeriod['start'],
+                    $googleEventPeriod['end']
+                )) {
                     continue;
                 }
 
@@ -161,6 +161,12 @@ class BatchGoogleCalSyncNotion extends Command
 
                 if ($registered) {
                     $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
+                    $registeredNotionEventIndex[$this->buildRegisteredNotionEventIndexKey(
+                        (string) $calendarLabel,
+                        $event->id,
+                        $googleEventPeriod['start'],
+                        $googleEventPeriod['end']
+                    )] = true;
 
                     $syncCountsByLabel[$calendarLabel] = ($syncCountsByLabel[$calendarLabel] ?? 0) + 1;
                     if (!array_key_exists($calendarLabel, $syncDetails)) {
@@ -203,11 +209,13 @@ class BatchGoogleCalSyncNotion extends Command
                         continue;
                     }
 
-                    $googleEventStart = $googleEventStartsById[$googleCalendarId] ?? null;
-                    $notionEventStart = $this->formatNotionEventStart($notionEvent);
+                    $googleEventPeriod = $googleEventPeriodsById[$googleCalendarId] ?? null;
+                    $notionEventPeriod = $this->formatNotionEventPeriod($notionEvent);
 
                     if (!in_array($googleCalendarId, $googleEventIds, true)
-                        || $googleEventStart !== $notionEventStart) {
+                        || $googleEventPeriod === null
+                        || $googleEventPeriod['start'] !== $notionEventPeriod['start']
+                        || $googleEventPeriod['end'] !== $notionEventPeriod['end']) {
                         try {
                             $deleted = $notions->deleteNotionEvent($notionEvent['id']);
                         } catch (\Exception $e) {
@@ -224,7 +232,7 @@ class BatchGoogleCalSyncNotion extends Command
 
                             $syncDetails[$calendarLabel][] = [
                                 'action' => '削除',
-                                'start' => $notionEventStart,
+                                'start' => $notionEventPeriod['start'],
                                 'summary' => $this->extractNotionSummary($notionEvent),
                             ];
                         }
@@ -270,6 +278,17 @@ class BatchGoogleCalSyncNotion extends Command
         return Command::SUCCESS;
     }
 
+    private function formatEventPeriod(object $event): array
+    {
+        $start = $this->formatEventStart($event);
+        $end = $this->formatEventEnd($event, $start);
+
+        return [
+            'start' => $start,
+            'end' => $end,
+        ];
+    }
+
     private function formatEventStart(object $event): string
     {
         if (!isset($event->start)) {
@@ -294,6 +313,36 @@ class BatchGoogleCalSyncNotion extends Command
         return '';
     }
 
+    private function formatEventEnd(object $event, string $fallbackStart = ''): string
+    {
+        if (!isset($event->end)) {
+            return $fallbackStart;
+        }
+
+        $end = $event->end;
+
+        if (isset($end->dateTime) && $end->dateTime !== '') {
+            try {
+                $dateTime = new \DateTime($end->dateTime);
+                return $dateTime->format('Y-m-d H:i');
+            } catch (\Exception $e) {
+                return (string) $end->dateTime;
+            }
+        }
+
+        if (isset($end->date) && $end->date !== '') {
+            try {
+                $date = new \DateTime($end->date, new \DateTimeZone(config('app.timezone')));
+                $date->sub(new \DateInterval('P1D'));
+                return $date->format('Y-m-d');
+            } catch (\Exception $e) {
+                return (string) $end->date;
+            }
+        }
+
+        return $fallbackStart;
+    }
+
     private function extractNotionLabel(array $notionEvent): string
     {
         $genre = $notionEvent['properties']['ジャンル']['multi_select'][0]['name'] ?? null;
@@ -301,11 +350,108 @@ class BatchGoogleCalSyncNotion extends Command
         return is_string($genre) ? $genre : '';
     }
 
+    private function extractNotionLabels(array $notionEvent): array
+    {
+        $multiSelect = $notionEvent['properties']['ジャンル']['multi_select'] ?? [];
+        if (!is_array($multiSelect)) {
+            return [];
+        }
+
+        $labels = [];
+        foreach ($multiSelect as $genre) {
+            $label = $genre['name'] ?? null;
+            if (is_string($label) && $label !== '') {
+                $labels[] = $label;
+            }
+        }
+
+        return $labels;
+    }
+
+    private function extractGoogleCalendarId(array $notionEvent): ?string
+    {
+        $richText = $notionEvent['properties']['googleCalendarId']['rich_text'] ?? null;
+
+        if (is_array($richText) && isset($richText[0]) && is_array($richText[0])) {
+            $googleCalendarId = $richText[0]['text']['content'] ?? null;
+
+            return is_string($googleCalendarId) && $googleCalendarId !== '' ? $googleCalendarId : null;
+        }
+
+        return null;
+    }
+
+    private function buildRegisteredNotionEventIndex(iterable $notionEvents): array
+    {
+        $index = [];
+
+        foreach ($notionEvents as $notionEvent) {
+            if (!is_array($notionEvent)) {
+                continue;
+            }
+
+            $googleCalendarId = $this->extractGoogleCalendarId($notionEvent);
+            if ($googleCalendarId === null) {
+                continue;
+            }
+
+            $period = $this->formatNotionEventPeriod($notionEvent);
+            $labels = $this->extractNotionLabels($notionEvent);
+            foreach ($labels as $label) {
+                $index[$this->buildRegisteredNotionEventIndexKey($label, $googleCalendarId, $period['start'], $period['end'])] = true;
+            }
+
+            if (empty($labels)) {
+                $index[$this->buildRegisteredNotionEventIndexKey('', $googleCalendarId, $period['start'], $period['end'])] = true;
+            }
+        }
+
+        return $index;
+    }
+
+    private function isRegisteredInNotion(
+        array $registeredNotionEventIndex,
+        string $googleCalendarId,
+        string $notionLabel,
+        string $start,
+        string $end
+    ): bool
+    {
+        if ($notionLabel === '') {
+            $suffix = "\0" . $googleCalendarId . "\0" . $start . "\0" . $end;
+            foreach (array_keys($registeredNotionEventIndex) as $key) {
+                if (str_ends_with($key, $suffix)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return isset($registeredNotionEventIndex[$this->buildRegisteredNotionEventIndexKey($notionLabel, $googleCalendarId, $start, $end)]);
+    }
+
+    private function buildRegisteredNotionEventIndexKey(string $notionLabel, string $googleCalendarId, string $start, string $end): string
+    {
+        return $notionLabel . "\0" . $googleCalendarId . "\0" . $start . "\0" . $end;
+    }
+
     private function extractNotionSummary(array $notionEvent): string
     {
         $title = $notionEvent['properties']['Name']['title'][0]['plain_text'] ?? null;
 
         return is_string($title) ? $title : '';
+    }
+
+    private function formatNotionEventPeriod(array $notionEvent): array
+    {
+        $start = $this->formatNotionEventStart($notionEvent);
+        $end = $this->formatNotionEventEnd($notionEvent, $start);
+
+        return [
+            'start' => $start,
+            'end' => $end,
+        ];
     }
 
     private function formatNotionEventStart(array $notionEvent): string
@@ -322,6 +468,23 @@ class BatchGoogleCalSyncNotion extends Command
             return $dateTime->format($hasTime ? 'Y-m-d H:i' : 'Y-m-d');
         } catch (\Exception $e) {
             return $start;
+        }
+    }
+
+    private function formatNotionEventEnd(array $notionEvent, string $fallbackStart = ''): string
+    {
+        $end = $notionEvent['properties']['Date']['date']['end'] ?? null;
+        if (!is_string($end) || $end === '') {
+            return $fallbackStart;
+        }
+
+        try {
+            $dateTime = new \DateTime($end, new \DateTimeZone(config('app.timezone')));
+            $hasTime = str_contains($end, 'T');
+
+            return $dateTime->format($hasTime ? 'Y-m-d H:i' : 'Y-m-d');
+        } catch (\Exception $e) {
+            return $end;
         }
     }
 }

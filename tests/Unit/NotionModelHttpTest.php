@@ -98,6 +98,34 @@ class NotionModelHttpTest extends TestCase
         $this->assertSame($expectedFilters, $secondBody['filter']['and']);
     }
 
+    public function test_get_upcoming_notion_events_fetches_all_pages(): void
+    {
+        $history = [];
+        $model = $this->createModelWithMockHandler([
+            new Response(200, [], json_encode([
+                'results' => [['id' => 'event-1']],
+                'has_more' => true,
+                'next_cursor' => 'cursor-2',
+            ])),
+            new Response(200, [], json_encode([
+                'results' => [['id' => 'event-2']],
+                'has_more' => false,
+                'next_cursor' => null,
+            ])),
+        ], $history);
+
+        $events = $model->getUpcomingNotionEvents('2024-01-01', '2024-01-31');
+
+        $this->assertSame(['event-1', 'event-2'], $events->pluck('id')->all());
+        $this->assertCount(2, $history);
+
+        $firstBody = json_decode((string) $history[0]['request']->getBody(), true);
+        $secondBody = json_decode((string) $history[1]['request']->getBody(), true);
+
+        $this->assertArrayNotHasKey('start_cursor', $firstBody);
+        $this->assertSame('cursor-2', $secondBody['start_cursor']);
+    }
+
     public function test_regist_notion_event_posts_page_payload_and_returns_true_on_success(): void
     {
         $history = [];
