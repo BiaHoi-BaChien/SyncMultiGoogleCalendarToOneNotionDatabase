@@ -130,6 +130,12 @@ class NotionModel extends Model
             [
                 'property' => 'Date',
                 'date' => [
+                    'on_or_after' => $start_date,
+                ],
+            ],
+            [
+                'property' => 'Date',
+                'date' => [
                     'on_or_before' => $end_date,
                 ],
             ],
