@@ -363,6 +363,45 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Mail::assertNothingSent();
     }
 
+
+    public function test_command_does_not_re_register_existing_cross_period_multi_day_all_day_event(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $event = (object) [
+            'id' => 'event-cross-period',
+            'summary' => 'Golden Week Trip',
+            'start' => (object) ['date' => '2026-04-29'],
+            'end' => (object) ['date' => '2026-05-02'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-existing',
+                'event-cross-period',
+                'Personal Label',
+                '2026-04-29',
+                '2026-05-01',
+                'Golden Week Trip'
+            ),
+        ]);
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+
+        Mail::assertNothingSent();
+    }
+
     public function test_command_keeps_existing_all_day_single_day_event_when_period_matches(): void
     {
         $this->setDefaultCalendarConfig();
