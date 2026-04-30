@@ -245,7 +245,45 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Mail::assertNothingSent();
     }
 
-    public function test_command_adds_new_event_and_deletes_old_event_when_start_changes(): void
+    public function test_command_does_not_re_register_when_label_differs_but_id_matches(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Board Meeting',
+            'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
+            'end' => (object) ['dateTime' => '2024-05-10T10:00:00+09:00'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-1',
+                'event-1',
+                'Different Label',
+                '2024-05-10T09:00:00+09:00',
+                '2024-05-10T10:00:00+09:00',
+                'Board Meeting'
+            ),
+        ]);
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_command_deletes_old_event_without_re_register_when_start_changes(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
@@ -280,12 +318,11 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertCount(1, NotionModelFake::$registCalls);
-        $this->assertSame('event-1', NotionModelFake::$registCalls[0][0]->id);
+        $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-old'], NotionModelFake::$deleteCalls);
     }
 
-    public function test_command_adds_new_event_and_deletes_old_event_when_end_changes(): void
+    public function test_command_deletes_old_event_without_re_register_when_end_changes(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
@@ -320,8 +357,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertCount(1, NotionModelFake::$registCalls);
-        $this->assertSame('event-1', NotionModelFake::$registCalls[0][0]->id);
+        $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-old'], NotionModelFake::$deleteCalls);
     }
 
