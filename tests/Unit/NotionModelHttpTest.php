@@ -66,12 +66,6 @@ class NotionModelHttpTest extends TestCase
             [
                 'property' => 'Date',
                 'date' => [
-                    'on_or_after' => '2024-01-01',
-                ],
-            ],
-            [
-                'property' => 'Date',
-                'date' => [
                     'on_or_before' => '2024-01-31',
                 ],
             ],

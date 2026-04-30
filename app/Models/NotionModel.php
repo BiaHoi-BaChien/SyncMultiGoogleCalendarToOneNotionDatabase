@@ -130,12 +130,6 @@ class NotionModel extends Model
             [
                 'property' => 'Date',
                 'date' => [
-                    'on_or_after' => $start_date,
-                ],
-            ],
-            [
-                'property' => 'Date',
-                'date' => [
                     'on_or_before' => $end_date,
                 ],
             ],
@@ -181,7 +175,32 @@ class NotionModel extends Model
             $startCursor = $data['next_cursor'] ?? null;
         } while (($data['has_more'] ?? false) && $startCursor !== null);
 
-        return collect($results);
+
+        $targetStart = new DateTime($start_date, new DateTimeZone(config('app.timezone')));
+        $targetEnd = new DateTime($end_date, new DateTimeZone(config('app.timezone')));
+
+        return collect($results)->filter(function (array $event) use ($targetStart, $targetEnd) {
+            $eventDate = $event['properties']['Date']['date'] ?? null;
+            if (!is_array($eventDate) || empty($eventDate['start'])) {
+                return false;
+            }
+
+            try {
+                $eventStart = new DateTime($eventDate['start'], new DateTimeZone(config('app.timezone')));
+            } catch (\Exception $e) {
+                return false;
+            }
+
+            $eventEndRaw = $eventDate['end'] ?? $eventDate['start'];
+            try {
+                $eventEnd = new DateTime($eventEndRaw, new DateTimeZone(config('app.timezone')));
+            } catch (\Exception $e) {
+                $eventEnd = clone $eventStart;
+            }
+
+            return $eventStart <= $targetEnd && $eventEnd >= $targetStart;
+        })->values();
+
     }
 
     /**
