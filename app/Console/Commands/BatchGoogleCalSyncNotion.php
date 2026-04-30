@@ -88,12 +88,55 @@ class BatchGoogleCalSyncNotion extends Command
 
         $notions = new NotionModel;
 
-        // 設定値(sync_max_days)に従い同期対象の日付を取得
-        $targetDateStart = (string)date("Y-m-d");
-        $targetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
-
         // 除外するジャンルのラベルを取得
         $excludeLabels = array_column($holidayCalendarList, 'notion_label');
+
+        // まずGoogleカレンダーのイベントを収集し、Notion取得範囲を決定する
+        $defaultTargetDateStart = (string)date("Y-m-d");
+        $defaultTargetDateEnd = (string)date("Y-m-d", strtotime('+'. config('app.sync_max_days') .'day'));
+
+        $googleEventsByCalendar = [];
+        $globalStart = null;
+        $globalEnd = null;
+
+        foreach (array_keys($calendar_list) as $key){
+            if(empty($calendar_list[$key]['calendar_id'])){
+                $googleEventsByCalendar[$key] = [];
+                continue;
+            }
+
+            $googlecal = new GoogleCalendarModel;
+
+            try{
+                $events = $googlecal->getGoogleCalendarEventList($defaultTargetDateStart, $defaultTargetDateEnd, $calendar_list[$key]['calendar_id']);
+            }catch (\Exception $e){
+                report($e);
+                return Command::FAILURE;
+            }
+
+            $filteredEvents = [];
+            foreach ($events as $event) {
+                // 参加型のイベントで自分が参加するもの以外はスルー
+                if (isset($event->attendees) && !$googlecal->isUserParticipating($event)) {
+                    continue;
+                }
+
+                $filteredEvents[] = $event;
+
+                $period = $this->formatEventPeriod($event);
+                if ($period['start'] !== '' && ($globalStart === null || strcmp($period['start'], $globalStart) < 0)) {
+                    $globalStart = $period['start'];
+                }
+                if ($period['end'] !== '' && ($globalEnd === null || strcmp($period['end'], $globalEnd) > 0)) {
+                    $globalEnd = $period['end'];
+                }
+            }
+
+            $googleEventsByCalendar[$key] = $filteredEvents;
+        }
+
+        $targetDateStart = $globalStart ?? $defaultTargetDateStart;
+        $targetDateEnd = $globalEnd ?? $defaultTargetDateEnd;
 
         // Notionに登録されている指定範囲のイベントを取得
         try {
@@ -110,7 +153,7 @@ class BatchGoogleCalSyncNotion extends Command
         $registeredNotionEventIndex = $this->buildRegisteredNotionEventIndex($notionEvents);
         $registeredNotionEventIds = $this->buildRegisteredNotionEventIdIndex($notionEvents);
 
-        // 各Google Calenterから指定範囲のイベントを取得
+        // 各Google Calendarイベントを同期
         foreach (array_keys($calendar_list) as $key){
             if(empty($calendar_list[$key]['calendar_id'])){
                 continue;
@@ -118,24 +161,9 @@ class BatchGoogleCalSyncNotion extends Command
 
             $googleEventIds = [];
             $googleEventPeriodsById = [];
-            $events = [];
-            $googlecal = new GoogleCalendarModel;
-
-            try{
-                $events = $googlecal->getGoogleCalendarEventList( $targetDateStart, $targetDateEnd, $calendar_list[$key]['calendar_id']);
-            }catch (\Exception $e){
-                report($e);
-                return Command::FAILURE;
-            };
+            $events = $googleEventsByCalendar[$key] ?? [];
 
             foreach ($events as $event) {
-                // 参加型のイベントで自分が参加するもの以外はスルー
-                if (isset($event->attendees)) {
-                    if (!$googlecal->isUserParticipating($event)){
-                        continue;
-                    }
-                }
-
                 // イベントIDを配列に格納
                 $googleEventIds[] = $event->id;
                 $googleEventPeriodsById[$event->id] = $this->formatEventPeriod($event);
