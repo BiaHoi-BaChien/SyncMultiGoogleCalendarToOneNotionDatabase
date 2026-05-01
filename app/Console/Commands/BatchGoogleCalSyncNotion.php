@@ -137,6 +137,10 @@ class BatchGoogleCalSyncNotion extends Command
 
         $targetDateStart = $globalStart ?? $defaultTargetDateStart;
         $targetDateEnd = $globalEnd ?? $defaultTargetDateEnd;
+        $syncWindow = [
+            'start' => $targetDateStart,
+            'end' => $targetDateEnd,
+        ];
 
         // Notionに登録されている指定範囲のイベントを取得
         try {
@@ -242,6 +246,9 @@ class BatchGoogleCalSyncNotion extends Command
 
                     $googleEventPeriod = $googleEventPeriodsById[$googleCalendarId] ?? null;
                     $notionEventPeriod = $this->formatNotionEventPeriod($notionEvent);
+                    if (!$this->isPeriodOverlapping($notionEventPeriod, $syncWindow)) {
+                        continue;
+                    }
 
                     if (!in_array($googleCalendarId, $googleEventIds, true)
                         || $googleEventPeriod === null
@@ -509,6 +516,38 @@ class BatchGoogleCalSyncNotion extends Command
             'start' => $start,
             'end' => $end,
         ];
+    }
+
+    private function isPeriodOverlapping(array $eventPeriod, array $windowPeriod): bool
+    {
+        $eventStart = $this->normalizePeriodBoundary($eventPeriod['start'] ?? '', true);
+        $eventEnd = $this->normalizePeriodBoundary($eventPeriod['end'] ?? '', false);
+        $windowStart = $this->normalizePeriodBoundary($windowPeriod['start'] ?? '', true);
+        $windowEnd = $this->normalizePeriodBoundary($windowPeriod['end'] ?? '', false);
+
+        if ($eventStart === null || $eventEnd === null || $windowStart === null || $windowEnd === null) {
+            return true;
+        }
+
+        return $eventStart <= $windowEnd && $eventEnd >= $windowStart;
+    }
+
+    private function normalizePeriodBoundary(string $value, bool $isStart): ?\DateTimeImmutable
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+                $suffix = $isStart ? ' 00:00:00' : ' 23:59:59';
+                return new \DateTimeImmutable($value . $suffix, new \DateTimeZone(config('app.timezone')));
+            }
+
+            return new \DateTimeImmutable($value, new \DateTimeZone(config('app.timezone')));
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     private function formatNotionEventStart(array $notionEvent): string
