@@ -155,7 +155,6 @@ class BatchGoogleCalSyncNotion extends Command
         }
 
         $registeredNotionEventIndex = $this->buildRegisteredNotionEventIndex($notionEvents);
-        $registeredNotionEventIds = $this->buildRegisteredNotionEventIdIndex($notionEvents);
 
         // 各Google Calendarイベントを同期
         foreach (array_keys($calendar_list) as $key){
@@ -175,7 +174,6 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // 既にNotionに登録されているのでスルー
                 if ($this->isRegisteredInNotion(
-                    $registeredNotionEventIds,
                     $registeredNotionEventIndex,
                     $event->id,
                     (string) ($calendar_list[$key]['notion_label'] ?? ''),
@@ -195,7 +193,6 @@ class BatchGoogleCalSyncNotion extends Command
 
                 if ($registered) {
                     $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
-                    $registeredNotionEventIds[$event->id] = true;
                     $registeredNotionEventIndex[$this->buildRegisteredNotionEventIndexKey(
                         (string) $calendarLabel,
                         $event->id,
@@ -448,28 +445,7 @@ class BatchGoogleCalSyncNotion extends Command
     }
 
 
-    private function buildRegisteredNotionEventIdIndex(iterable $notionEvents): array
-    {
-        $index = [];
-
-        foreach ($notionEvents as $notionEvent) {
-            if (!is_array($notionEvent)) {
-                continue;
-            }
-
-            $googleCalendarId = $this->extractGoogleCalendarId($notionEvent);
-            if ($googleCalendarId === null) {
-                continue;
-            }
-
-            $index[$googleCalendarId] = true;
-        }
-
-        return $index;
-    }
-
     private function isRegisteredInNotion(
-        array $registeredNotionEventIds,
         array $registeredNotionEventIndex,
         string $googleCalendarId,
         string $notionLabel,
@@ -477,21 +453,6 @@ class BatchGoogleCalSyncNotion extends Command
         string $end
     ): bool
     {
-        if (isset($registeredNotionEventIds[$googleCalendarId])) {
-            return true;
-        }
-
-        if ($notionLabel === '') {
-            $suffix = "\0" . $googleCalendarId . "\0" . $start . "\0" . $end;
-            foreach (array_keys($registeredNotionEventIndex) as $key) {
-                if (str_ends_with($key, $suffix)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         return isset($registeredNotionEventIndex[$this->buildRegisteredNotionEventIndexKey($notionLabel, $googleCalendarId, $start, $end)]);
     }
 
