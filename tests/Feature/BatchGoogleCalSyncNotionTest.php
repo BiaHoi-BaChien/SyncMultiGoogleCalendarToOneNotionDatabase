@@ -76,10 +76,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
-        $expectedStart = date('Y-m-d');
-        $expectedEnd = date('Y-m-d', strtotime('+3 day'));
         $this->assertSame([
-            [$expectedStart, $expectedEnd, ['Holiday Label']],
+            ['2024-05-10 09:00', '2024-05-10 09:00', ['Holiday Label']],
         ], NotionModelFake::$getUpcomingArgs);
         $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
@@ -245,7 +243,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Mail::assertNothingSent();
     }
 
-    public function test_command_does_not_re_register_when_label_differs_but_id_matches(): void
+    public function test_command_registers_when_label_differs_even_if_id_matches(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
@@ -267,6 +265,9 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 'Board Meeting'
             ),
         ]);
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
 
         GoogleCalendarModelFake::$eventLists = [
             'calendar-personal' => [$event],
@@ -277,13 +278,60 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame($event, NotionModelFake::$registCalls[0][0]);
+        $this->assertSame('Personal Label', NotionModelFake::$registCalls[0][1]);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
-        Mail::assertNothingSent();
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
+            $mail->build();
+
+            return $mail->totals === ['Personal Label' => 1];
+        });
     }
 
-    public function test_command_deletes_old_event_without_re_register_when_start_changes(): void
+    public function test_command_registers_empty_label_event_when_existing_event_has_different_label(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.google_calendar_label_personal', '');
+
+        $event = (object) [
+            'id' => 'event-1',
+            'summary' => 'Board Meeting',
+            'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
+            'end' => (object) ['dateTime' => '2024-05-10T10:00:00+09:00'],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-event-1',
+                'event-1',
+                'Different Label',
+                '2024-05-10T09:00:00+09:00',
+                '2024-05-10T10:00:00+09:00',
+                'Board Meeting'
+            ),
+        ]);
+        NotionModelFake::$registResults = [
+            'event-1' => true,
+        ];
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [$event],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame($event, NotionModelFake::$registCalls[0][0]);
+        $this->assertSame('', NotionModelFake::$registCalls[0][1]);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+    }
+
+    public function test_command_registers_new_event_and_deletes_old_event_when_start_changes(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
@@ -300,8 +348,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 'notion-event-old',
                 'event-1',
                 'Personal Label',
-                '2024-05-01T09:00:00+09:00',
-                '2024-05-01T10:00:00+09:00',
+                '2024-05-02T08:00:00+09:00',
+                '2024-05-02T09:00:00+09:00',
                 'Test'
             ),
         ]);
@@ -318,11 +366,13 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame($event, NotionModelFake::$registCalls[0][0]);
+        $this->assertSame('Personal Label', NotionModelFake::$registCalls[0][1]);
         $this->assertSame(['notion-event-old'], NotionModelFake::$deleteCalls);
     }
 
-    public function test_command_deletes_old_event_without_re_register_when_end_changes(): void
+    public function test_command_registers_new_event_and_deletes_old_event_when_end_changes(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
@@ -357,7 +407,9 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertSame($event, NotionModelFake::$registCalls[0][0]);
+        $this->assertSame('Personal Label', NotionModelFake::$registCalls[0][1]);
         $this->assertSame(['notion-event-old'], NotionModelFake::$deleteCalls);
     }
 
@@ -501,10 +553,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
-        $expectedStart = date('Y-m-d');
-        $expectedEnd = date('Y-m-d');
         $this->assertSame([
-            [$expectedStart, $expectedEnd, []],
+            ['2024-09-15', '2024-09-15', []],
         ], NotionModelFake::$getUpcomingArgs);
         $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
@@ -550,7 +600,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                     ],
                     'Date' => [
                         'date' => [
-                            'start' => '2024-05-11T10:00:00+09:00',
+                            'start' => '2024-05-12T10:00:00+09:00',
                         ],
                     ],
                     'googleCalendarId' => [
@@ -625,14 +675,14 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                     'Personal Label' => [
                         [
                             'action' => '削除',
-                            'start' => '2024-05-11 10:00',
+                            'start' => '2024-05-12 10:00',
                             'summary' => 'Stale Notion Event',
                         ],
                     ],
                 ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Personal Label: 1件')
-                && str_contains($rendered, '  - (削除) 2024-05-11 10:00 Stale Notion Event');
+                && str_contains($rendered, '  - (削除) 2024-05-12 10:00 Stale Notion Event');
         });
     }
 
