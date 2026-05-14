@@ -75,7 +75,16 @@ class NotionModelTest extends TestCase
         $model = $this->createModelWithResponses([
             new Response(200, [], json_encode([
                 'results' => [
-                    ['id' => 'upcoming-event-1'],
+                    [
+                        'id' => 'upcoming-event-1',
+                        'properties' => [
+                            'Date' => [
+                                'date' => [
+                                    'start' => '2024-05-03',
+                                ],
+                            ],
+                        ],
+                    ],
                 ],
             ])),
         ], $history);

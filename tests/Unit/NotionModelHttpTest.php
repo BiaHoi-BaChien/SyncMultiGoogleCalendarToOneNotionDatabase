@@ -30,7 +30,20 @@ class NotionModelHttpTest extends TestCase
         $history = [];
         $model = $this->createModelWithMockHandler([
             new Response(200, [], json_encode(['results' => [['id' => 'collection-1']]])),
-            new Response(200, [], json_encode(['results' => [['id' => 'event-1']]])),
+            new Response(200, [], json_encode([
+                'results' => [
+                    [
+                        'id' => 'event-1',
+                        'properties' => [
+                            'Date' => [
+                                'date' => [
+                                    'start' => '2024-01-15',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ])),
         ], $history);
 
         $collections = $model->getCollectionsFromNotion('primary-calendar');
@@ -97,12 +110,34 @@ class NotionModelHttpTest extends TestCase
         $history = [];
         $model = $this->createModelWithMockHandler([
             new Response(200, [], json_encode([
-                'results' => [['id' => 'event-1']],
+                'results' => [
+                    [
+                        'id' => 'event-1',
+                        'properties' => [
+                            'Date' => [
+                                'date' => [
+                                    'start' => '2024-01-10',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
                 'has_more' => true,
                 'next_cursor' => 'cursor-2',
             ])),
             new Response(200, [], json_encode([
-                'results' => [['id' => 'event-2']],
+                'results' => [
+                    [
+                        'id' => 'event-2',
+                        'properties' => [
+                            'Date' => [
+                                'date' => [
+                                    'start' => '2024-01-20',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
                 'has_more' => false,
                 'next_cursor' => null,
             ])),
@@ -226,4 +261,3 @@ class NotionModelHttpTest extends TestCase
         return $event;
     }
 }
-
