@@ -21,6 +21,20 @@ class NotionModel extends Model
 
     private static $dataSourceIdCache = [];
 
+    public function resolveCalendarDataSourceId(): string
+    {
+        return $this->getDataSourceId();
+    }
+
+    public function getCalendarDataSourceSchema(): array
+    {
+        $dataSourceId = $this->getDataSourceId();
+        $response = $this->client->get('data_sources/' . $dataSourceId);
+        $data = json_decode($response->getBody(), true);
+
+        return is_array($data) ? $data : [];
+    }
+
     /**
      * NotionModel constructor.
      */
@@ -239,7 +253,7 @@ class NotionModel extends Model
     {
         $response = $this->client->patch('pages/' . $eventId, [
             'json' => [
-                'archived' => true,
+                'in_trash' => true,
             ],
         ]);
 
