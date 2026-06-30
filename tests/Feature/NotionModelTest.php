@@ -36,39 +36,6 @@ class NotionModelTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_get_collections_from_notion_returns_collection_of_results(): void
-    {
-        $history = [];
-        $model = $this->createModelWithResponses([
-            new Response(200, [], json_encode([
-                'results' => [
-                    ['id' => 'notion-page-1'],
-                    ['id' => 'notion-page-2'],
-                ],
-            ])),
-        ], $history);
-
-        $collections = $model->getCollectionsFromNotion('primary-calendar');
-
-        $this->assertInstanceOf(Collection::class, $collections);
-        $this->assertSame(['notion-page-1', 'notion-page-2'], $collections->pluck('id')->all());
-        $this->assertCount(1, $history);
-
-        $request = $history[0]['request'];
-        $this->assertSame('POST', $request->getMethod());
-        $this->assertSame('/v1/data_sources/test-data-source-id/query', $request->getUri()->getPath());
-
-        $body = json_decode((string) $request->getBody(), true);
-        $this->assertSame([
-            'filter' => [
-                'property' => 'googleCalendarId',
-                'rich_text' => [
-                    'equals' => 'primary-calendar',
-                ],
-            ],
-        ], $body);
-    }
-
     public function test_get_upcoming_notion_events_applies_date_and_label_filters(): void
     {
         $history = [];

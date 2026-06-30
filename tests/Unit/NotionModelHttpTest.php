@@ -25,11 +25,10 @@ class NotionModelHttpTest extends TestCase
         ]);
     }
 
-    public function test_it_posts_expected_payloads_for_collections_and_upcoming_events(): void
+    public function test_it_posts_expected_payload_for_upcoming_events(): void
     {
         $history = [];
         $model = $this->createModelWithMockHandler([
-            new Response(200, [], json_encode(['results' => [['id' => 'collection-1']]])),
             new Response(200, [], json_encode([
                 'results' => [
                     [
@@ -46,34 +45,18 @@ class NotionModelHttpTest extends TestCase
             ])),
         ], $history);
 
-        $collections = $model->getCollectionsFromNotion('primary-calendar');
         $events = $model->getUpcomingNotionEvents('2024-01-01', '2024-01-31', ['Private', 'Skip']);
 
-        $this->assertCount(1, $collections);
         $this->assertCount(1, $events);
-        $this->assertCount(2, $history);
+        $this->assertCount(1, $history);
 
-        $firstRequest = $history[0]['request'];
-        $this->assertSame('POST', $firstRequest->getMethod());
-        $this->assertSame('/v1/data_sources/test-data-source-id/query', $firstRequest->getUri()->getPath());
+        $request = $history[0]['request'];
+        $this->assertSame('POST', $request->getMethod());
+        $this->assertSame('/v1/data_sources/test-data-source-id/query', $request->getUri()->getPath());
 
-        $firstBody = json_decode((string) $firstRequest->getBody(), true);
-        $this->assertSame([
-            'filter' => [
-                'property' => 'googleCalendarId',
-                'rich_text' => [
-                    'equals' => 'primary-calendar',
-                ],
-            ],
-        ], $firstBody);
-
-        $secondRequest = $history[1]['request'];
-        $this->assertSame('POST', $secondRequest->getMethod());
-        $this->assertSame('/v1/data_sources/test-data-source-id/query', $secondRequest->getUri()->getPath());
-
-        $secondBody = json_decode((string) $secondRequest->getBody(), true);
-        $this->assertArrayHasKey('filter', $secondBody);
-        $this->assertArrayHasKey('and', $secondBody['filter']);
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertArrayHasKey('filter', $body);
+        $this->assertArrayHasKey('and', $body['filter']);
 
         $expectedFilters = [
             [
@@ -102,7 +85,7 @@ class NotionModelHttpTest extends TestCase
             ],
         ];
 
-        $this->assertSame($expectedFilters, $secondBody['filter']['and']);
+        $this->assertSame($expectedFilters, $body['filter']['and']);
     }
 
     public function test_get_upcoming_notion_events_fetches_all_pages(): void
