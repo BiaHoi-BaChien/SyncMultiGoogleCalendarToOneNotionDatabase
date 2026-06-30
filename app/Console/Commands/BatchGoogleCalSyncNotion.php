@@ -26,16 +26,6 @@ class BatchGoogleCalSyncNotion extends Command
      */
     protected $description = '複数のGoogleカレンダーをNotionのカレンダーに同期する。追加／削除のみ。更新には対応していない。';
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
     private function getGoogleCalendarList(): array
     {
         return array (
@@ -99,8 +89,8 @@ class BatchGoogleCalSyncNotion extends Command
         $globalStart = null;
         $globalEnd = null;
 
-        foreach (array_keys($calendar_list) as $key){
-            if(empty($calendar_list[$key]['calendar_id'])){
+        foreach ($calendar_list as $key => $calendar){
+            if(empty($calendar['calendar_id'])){
                 $googleEventsByCalendar[$key] = [];
                 continue;
             }
@@ -108,9 +98,10 @@ class BatchGoogleCalSyncNotion extends Command
             $googlecal = new GoogleCalendarModel;
 
             try{
-                $events = $googlecal->getGoogleCalendarEventList($defaultTargetDateStart, $defaultTargetDateEnd, $calendar_list[$key]['calendar_id']);
+                $events = $googlecal->getGoogleCalendarEventList($defaultTargetDateStart, $defaultTargetDateEnd, $calendar['calendar_id']);
             }catch (\Exception $e){
                 report($e);
+                $this->error($e->getMessage());
                 return Command::FAILURE;
             }
 
@@ -151,14 +142,15 @@ class BatchGoogleCalSyncNotion extends Command
             );
         } catch (\Exception $e) {
             report($e);
+            $this->error($e->getMessage());
             return Command::FAILURE;
         }
 
         $registeredNotionEventIndex = $this->buildRegisteredNotionEventIndex($notionEvents);
 
         // 各Google Calendarイベントを同期
-        foreach (array_keys($calendar_list) as $key){
-            if(empty($calendar_list[$key]['calendar_id'])){
+        foreach ($calendar_list as $key => $calendar){
+            if(empty($calendar['calendar_id'])){
                 continue;
             }
 
@@ -176,7 +168,7 @@ class BatchGoogleCalSyncNotion extends Command
                 if ($this->isRegisteredInNotion(
                     $registeredNotionEventIndex,
                     $event->id,
-                    (string) ($calendar_list[$key]['notion_label'] ?? ''),
+                    (string) ($calendar['notion_label'] ?? ''),
                     $googleEventPeriod['start'],
                     $googleEventPeriod['end']
                 )) {
@@ -185,14 +177,15 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // Notionに登録
                 try{
-                    $registered = $notions->registNotionEvent($event, $calendar_list[$key]['notion_label']);
+                    $registered = $notions->registNotionEvent($event, $calendar['notion_label']);
                 }catch(\Exception $e){
                     report($e);
+                    $this->error($e->getMessage());
                     return Command::FAILURE;
                 }
 
                 if ($registered) {
-                    $calendarLabel = $calendar_list[$key]['notion_label'] ?? $key;
+                    $calendarLabel = $calendar['notion_label'] ?? $key;
                     $registeredNotionEventIndex[$this->buildRegisteredNotionEventIndexKey(
                         (string) $calendarLabel,
                         $event->id,
@@ -216,7 +209,7 @@ class BatchGoogleCalSyncNotion extends Command
             // googleCalendarIdが設定されているにも関わらずGoogleカレンダーに存在しないイベントをNotionから削除
             // 祝日カレンダーの場合は削除しない
             if ($deleteNotionTasks) {
-                $targetLabel = $calendar_list[$key]['notion_label'] ?? '';
+                $targetLabel = $calendar['notion_label'] ?? '';
                 $filteredNotionEvents = collect($notionEvents)
                     ->filter(function (array $notionEvent) use ($targetLabel) {
                         $label = $this->extractNotionLabel($notionEvent);
@@ -225,18 +218,8 @@ class BatchGoogleCalSyncNotion extends Command
                     });
 
                 foreach ($filteredNotionEvents as $notionEvent) {
-                    $googleCalendarId = null;
-
-                    if (isset($notionEvent['properties']['googleCalendarId'])) {
-                        $googleCalendarProperty = $notionEvent['properties']['googleCalendarId'];
-                        $richText = $googleCalendarProperty['rich_text'] ?? null;
-
-                        if (is_array($richText) && isset($richText[0]) && is_array($richText[0])) {
-                            $googleCalendarId = $richText[0]['text']['content'] ?? null;
-                        }
-                    }
-
-                    if (!is_string($googleCalendarId) || $googleCalendarId === '') {
+                    $googleCalendarId = $this->extractGoogleCalendarId($notionEvent);
+                    if ($googleCalendarId === null) {
                         // googleCalendarId が取得できない場合は削除候補に含めない
                         continue;
                     }
@@ -255,6 +238,7 @@ class BatchGoogleCalSyncNotion extends Command
                             $deleted = $notions->deleteNotionEvent($notionEvent['id']);
                         } catch (\Exception $e) {
                             report($e);
+                            $this->error($e->getMessage());
                             return Command::FAILURE;
                         }
 
@@ -293,6 +277,7 @@ class BatchGoogleCalSyncNotion extends Command
                     $slackMessages = $slackNotifier->send($bodyText);
                 } catch (\Throwable $e) {
                     report($e);
+                    $this->error($e->getMessage());
                     return Command::FAILURE;
                 }
 
@@ -304,6 +289,7 @@ class BatchGoogleCalSyncNotion extends Command
                     } catch (\Throwable $e) {
                         $slackNotifier->notifyError($slackMessages ?? [], $e);
                         report($e);
+                        $this->error($e->getMessage());
                         return Command::FAILURE;
                     }
                 }

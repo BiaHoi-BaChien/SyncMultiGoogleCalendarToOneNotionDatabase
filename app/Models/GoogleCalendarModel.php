@@ -2,16 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Google_Client;
 use Google_Service_Calendar;
 use Google\Service\Calendar\Event;
 
-class GoogleCalendarModel extends Model
+class GoogleCalendarModel
 {
-    use HasFactory;
-
     /**
      * Googleカレンダーのイベントリストを取得する
      *

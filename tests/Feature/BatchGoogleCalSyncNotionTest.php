@@ -47,6 +47,9 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         config()->set('app.google_calendar_label_holiday', 'Holiday Label');
 
         config()->set('app.sync_max_days', 0);
+        config()->set('app.slack_bot_enabled', false);
+        config()->set('app.slack_bot_token', null);
+        config()->set('app.slack_dm_user_ids', null);
     }
 
     public function test_command_sends_mail_when_new_events_synced(): void
@@ -79,7 +82,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertSame([
             ['2024-05-10 09:00', '2024-05-10 09:00', ['Holiday Label']],
         ], NotionModelFake::$getUpcomingArgs);
-        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
@@ -236,7 +238,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
-        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
@@ -556,7 +557,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertSame([
             ['2024-09-15', '2024-09-15', []],
         ], NotionModelFake::$getUpcomingArgs);
-        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertCount(1, NotionModelFake::$registCalls);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
@@ -662,7 +662,6 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
-        $this->assertSame([], NotionModelFake::$getCollectionsCalls);
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-1'], NotionModelFake::$deleteCalls);
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {

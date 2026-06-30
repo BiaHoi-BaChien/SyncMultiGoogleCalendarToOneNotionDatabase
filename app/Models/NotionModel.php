@@ -3,20 +3,16 @@
 namespace App\Models;
 
 use DateInterval;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use GuzzleHttp\Client;
 use Google\Service\Calendar\Event;
 use DateTime;
 use DateTimeZone;
 use RuntimeException;
 
-class NotionModel extends Model
+class NotionModel
 {
-    use HasFactory;
     private $client;
     private $databaseId;
-    private $token;
     private $dataSourceId;
 
     private static $dataSourceIdCache = [];
@@ -49,7 +45,6 @@ class NotionModel extends Model
             ],
         ]);
         $this->databaseId = config('app.notion_database_id_of_calendar');
-        $this->token = config('app.notion_api_token');
         $this->dataSourceId = null;
     }
 
@@ -85,49 +80,6 @@ class NotionModel extends Model
         }
 
         throw new RuntimeException('Unable to resolve Notion data source id for database ' . $this->databaseId . '.');
-    }
-
-    /**
-     * 指定したGoogleカレンダーIDに対応するNotionのコレクションを取得する
-     *
-     * @param string $googleCalendarId
-     * @param string $notionLabel
-     * @return \Illuminate\Support\Collection
-     */
-    public function getCollectionsFromNotion(string $googleCalendarId, string $notionLabel = '')
-    {
-        $dataSourceId = $this->getDataSourceId();
-        $googleCalendarFilter = [
-            'property' => 'googleCalendarId',
-            'rich_text' => [
-                'equals' => $googleCalendarId,
-            ],
-        ];
-
-        $filter = $googleCalendarFilter;
-
-        if ($notionLabel !== '') {
-            $filter = [
-                'and' => [
-                    $googleCalendarFilter,
-                    [
-                        'property' => 'ジャンル',
-                        'multi_select' => [
-                            'contains' => $notionLabel,
-                        ],
-                    ],
-                ],
-            ];
-        }
-
-        $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
-            'json' => [
-                'filter' => $filter,
-            ],
-        ]);
-
-        $data = json_decode($response->getBody(), true);
-        return collect($data['results']);
     }
 
     /**
