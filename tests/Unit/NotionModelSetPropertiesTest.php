@@ -97,6 +97,40 @@ class NotionModelSetPropertiesTest extends TestCase
         $this->assertSame('event-3', $properties['googleCalendarId']['rich_text'][0]['text']['content']);
     }
 
+    public function test_setPropaties_keepsMemoAtNotionCharacterLimit(): void
+    {
+        $event = $this->createEventWithDateTime(
+            'event-4',
+            'Memo at character limit',
+            '2023-10-10T09:00:00+09:00',
+            '2023-10-10T10:00:00+09:00'
+        );
+        $description = str_repeat('あ', 2000);
+        $event->setDescription($description);
+
+        $properties = $this->invokeSetProperties($event, 'Work');
+
+        $this->assertSame($description, $properties['メモ']['rich_text'][0]['text']['content']);
+    }
+
+    public function test_setPropaties_replacesMemoOverNotionCharacterLimit(): void
+    {
+        $event = $this->createEventWithDateTime(
+            'event-5',
+            'Memo over character limit',
+            '2023-10-10T09:00:00+09:00',
+            '2023-10-10T10:00:00+09:00'
+        );
+        $event->setDescription(str_repeat('あ', 2001));
+
+        $properties = $this->invokeSetProperties($event, 'Work');
+
+        $this->assertSame(
+            'メモ本文は上限文字数を超えているためNotionからの同期はできませんでした',
+            $properties['メモ']['rich_text'][0]['text']['content']
+        );
+    }
+
     private function createEventWithDateTime(string $id, string $summary, string $start, string $end): Event
     {
         $event = new Event();
