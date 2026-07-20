@@ -11,6 +11,9 @@ use RuntimeException;
 
 class NotionModel
 {
+    private const NOTION_RICH_TEXT_CONTENT_LIMIT = 2000;
+    private const LONG_MEMO_FALLBACK = 'メモ本文は上限文字数を超えているためNotionからの同期はできませんでした';
+
     private $client;
     private $databaseId;
     private $dataSourceId;
@@ -267,11 +270,15 @@ class NotionModel
         ];
 
         if (!is_null($event->description)) {
+            $memo = mb_strlen($event->description) > self::NOTION_RICH_TEXT_CONTENT_LIMIT
+                ? self::LONG_MEMO_FALLBACK
+                : $event->description;
+
             $properties['メモ'] = [
                 'rich_text' => [
                     [
                         'type' => 'text',
-                        'text' => ['content' => $event->description],
+                        'text' => ['content' => $memo],
                     ],
                 ],
             ];
