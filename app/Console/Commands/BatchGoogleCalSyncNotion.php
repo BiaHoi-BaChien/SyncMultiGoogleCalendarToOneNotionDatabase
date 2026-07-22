@@ -128,9 +128,10 @@ class BatchGoogleCalSyncNotion extends Command
 
         $targetDateStart = $globalStart ?? $defaultTargetDateStart;
         $targetDateEnd = $globalEnd ?? $defaultTargetDateEnd;
-        $syncWindow = [
-            'start' => $targetDateStart,
-            'end' => $targetDateEnd,
+        // 継続中イベントに合わせたNotion取得範囲ではなく、Google APIへ要求した範囲内だけを削除対象にする
+        $deletionWindow = [
+            'start' => $defaultTargetDateStart,
+            'end' => $defaultTargetDateEnd,
         ];
 
         // Notionに登録されている指定範囲のイベントを取得
@@ -226,7 +227,7 @@ class BatchGoogleCalSyncNotion extends Command
 
                     $googleEventPeriod = $googleEventPeriodsById[$googleCalendarId] ?? null;
                     $notionEventPeriod = $this->formatNotionEventPeriod($notionEvent);
-                    if (!$this->isPeriodOverlapping($notionEventPeriod, $syncWindow)) {
+                    if (!$this->isPeriodOverlapping($notionEventPeriod, $deletionWindow)) {
                         continue;
                     }
 
