@@ -336,12 +336,13 @@ class BatchGoogleCalSyncNotionTest extends TestCase
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
+        $today = date('Y-m-d');
 
         $event = (object) [
             'id' => 'event-1',
             'summary' => 'Test',
-            'start' => (object) ['dateTime' => '2024-05-02T09:00:00+09:00'],
-            'end' => (object) ['dateTime' => '2024-05-02T10:00:00+09:00'],
+            'start' => (object) ['dateTime' => $today . 'T09:00:00+07:00'],
+            'end' => (object) ['dateTime' => $today . 'T10:00:00+07:00'],
         ];
 
         NotionModelFake::$upcomingEventsReturn = collect([
@@ -349,8 +350,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 'notion-event-old',
                 'event-1',
                 'Personal Label',
-                '2024-05-02T08:00:00+09:00',
-                '2024-05-02T09:00:00+09:00',
+                $today . 'T08:00:00+07:00',
+                $today . 'T09:00:00+07:00',
                 'Test'
             ),
         ]);
@@ -377,12 +378,13 @@ class BatchGoogleCalSyncNotionTest extends TestCase
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
+        $today = date('Y-m-d');
 
         $event = (object) [
             'id' => 'event-1',
             'summary' => 'Test',
-            'start' => (object) ['dateTime' => '2024-05-01T09:00:00+09:00'],
-            'end' => (object) ['dateTime' => '2024-05-01T11:00:00+09:00'],
+            'start' => (object) ['dateTime' => $today . 'T09:00:00+07:00'],
+            'end' => (object) ['dateTime' => $today . 'T11:00:00+07:00'],
         ];
 
         NotionModelFake::$upcomingEventsReturn = collect([
@@ -390,8 +392,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 'notion-event-old',
                 'event-1',
                 'Personal Label',
-                '2024-05-01T09:00:00+09:00',
-                '2024-05-01T10:00:00+09:00',
+                $today . 'T09:00:00+07:00',
+                $today . 'T10:00:00+07:00',
                 'Test'
             ),
         ]);
@@ -583,6 +585,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
+        $today = date('Y-m-d');
 
         $notionEvents = collect([
             [
@@ -600,7 +603,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                     ],
                     'Date' => [
                         'date' => [
-                            'start' => '2024-05-12T10:00:00+09:00',
+                            'start' => $today . 'T10:00:00+07:00',
                         ],
                     ],
                     'googleCalendarId' => [
@@ -632,7 +635,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                 ],
                 'Date' => [
                     'date' => [
-                        'start' => '2024-05-12T10:00:00+09:00',
+                        'start' => $today . 'T10:00:00+07:00',
                     ],
                 ],
                 'googleCalendarId' => [
@@ -651,7 +654,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             'calendar-personal' => [
                 (object) [
                     'id' => 'event-existing',
-                    'start' => (object) ['dateTime' => '2024-05-12T10:00:00+09:00'],
+                    'start' => (object) ['dateTime' => $today . 'T10:00:00+07:00'],
                 ],
             ],
         ];
@@ -664,7 +667,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-1'], NotionModelFake::$deleteCalls);
-        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) use ($today) {
             $mail->build();
 
             $rendered = $mail->render();
@@ -674,15 +677,73 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                     'Personal Label' => [
                         [
                             'action' => '削除',
-                            'start' => '2024-05-12 10:00',
+                            'start' => $today . ' 10:00',
                             'summary' => 'Stale Notion Event',
                         ],
                     ],
                 ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Personal Label: 1件')
-                && str_contains($rendered, '  - (削除) 2024-05-12 10:00 Stale Notion Event');
+                && str_contains($rendered, '  - (削除) ' . $today . ' 10:00 Stale Notion Event');
         });
+    }
+
+    public function test_command_does_not_delete_past_event_when_another_calendar_has_active_multi_day_event(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.google_calendar_id_personal', null);
+        config()->set('app.google_calendar_id_business', 'calendar-business');
+        config()->set('app.google_calendar_id_school', 'calendar-school');
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+
+        $activeStart = date('Y-m-d', strtotime('-4 days'));
+        $activeEndExclusive = date('Y-m-d', strtotime('+5 days'));
+        $activeEndInclusive = date('Y-m-d', strtotime('+4 days'));
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+
+        $activeSchoolEvent = (object) [
+            'id' => 'active-school-event',
+            'summary' => 'School Vacation',
+            'start' => (object) ['date' => $activeStart],
+            'end' => (object) ['date' => $activeEndExclusive],
+        ];
+
+        NotionModelFake::$upcomingEventsReturn = collect([
+            $this->makeNotionEvent(
+                'notion-past-business-event',
+                'past-business-event',
+                'Business Label',
+                $yesterday . 'T10:00:00+07:00',
+                $yesterday . 'T10:30:00+07:00',
+                'Past Business Meeting'
+            ),
+            $this->makeNotionEvent(
+                'notion-active-school-event',
+                'active-school-event',
+                'School Label',
+                $activeStart,
+                $activeEndInclusive,
+                'School Vacation'
+            ),
+        ]);
+
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-business' => [],
+            'calendar-school' => [$activeSchoolEvent],
+        ];
+
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame([
+            [$activeStart, $activeEndInclusive, ['Holiday Label']],
+        ], NotionModelFake::$getUpcomingArgs);
+        $this->assertSame([], NotionModelFake::$registCalls);
+        $this->assertSame([], NotionModelFake::$deleteCalls);
+
+        Mail::assertNothingSent();
     }
 
     public function test_command_skips_notion_events_when_google_calendar_id_missing(): void
