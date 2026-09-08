@@ -185,15 +185,25 @@ class NotionModel
 
         $dataSourceId = $this->getDataSourceId();
 
-        $response = $this->client->post('pages', [
-            'json' => [
-                'parent' => [
-                    'type' => 'data_source_id',
-                    'data_source_id' => $dataSourceId,
-                ],
-                'properties' => $page,
+        $payload = [
+            'parent' => [
+                'type' => 'data_source_id',
+                'data_source_id' => $dataSourceId,
             ],
-        ]);
+            'properties' => $page,
+        ];
+
+        if ($notion_label === config('app.google_calendar_label_school')) {
+            $payload['icon'] = [
+                'type' => 'icon',
+                'icon' => [
+                    'name' => 'school',
+                    'color' => 'green',
+                ],
+            ];
+        }
+
+        $response = $this->client->post('pages', ['json' => $payload]);
 
         return $response->getStatusCode() === 200;
     }
