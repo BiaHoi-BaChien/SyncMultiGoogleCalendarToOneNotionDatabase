@@ -57,7 +57,7 @@ class NotionCheckConnectionCommandTest extends TestCase
         $this->instance(NotionModel::class, $this->createModelWithResponses([]));
 
         $this->artisan('notion:check-connection')
-            ->expectsOutput("NOTION_VERSION must be 2025-09-03 or later for Notion data source API. Current: '2023-05-23'.")
+            ->expectsOutput("NOTION_VERSION must be 2026-03-11 or later for Notion data source API. Current: '2023-05-23'.")
             ->assertExitCode(1);
     }
 

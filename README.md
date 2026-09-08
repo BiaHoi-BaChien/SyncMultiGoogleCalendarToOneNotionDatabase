@@ -86,7 +86,7 @@ SLACK_DM_USER_IDS=U12345678,U23456789
 NOTION_API_TOKEN=notion_api_token
 NOTION_DATABASE_ID=notion_database_id
 NOTION_DATA_SOURCE_ID=datasource_id-of-your-database   # 省略可（未設定の場合は自動取得）
-NOTION_VERSION=2025-09-03
+NOTION_VERSION=2026-03-11
 
 # 同期期間（日数）
 SYNC_MAX_DAYS=90

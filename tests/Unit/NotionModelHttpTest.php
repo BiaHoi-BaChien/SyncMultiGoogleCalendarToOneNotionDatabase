@@ -22,6 +22,7 @@ class NotionModelHttpTest extends TestCase
         config([
             'app.notion_data_source_id' => 'test-data-source-id',
             'app.timezone' => 'UTC',
+            'app.google_calendar_label_school' => '学校',
         ]);
     }
 
@@ -163,6 +164,27 @@ class NotionModelHttpTest extends TestCase
         $this->assertArrayHasKey('Name', $body['properties']);
         $this->assertArrayHasKey('Date', $body['properties']);
         $this->assertSame('Work', $body['properties']['ジャンル']['multi_select'][0]['name']);
+        $this->assertArrayNotHasKey('icon', $body);
+    }
+
+    public function test_regist_notion_event_sets_green_school_icon_for_school_calendar(): void
+    {
+        $history = [];
+        $model = $this->createModelWithMockHandler([
+            new Response(200, [], json_encode(['id' => 'page-id'])),
+        ], $history);
+
+        $result = $model->registNotionEvent($this->createCalendarEvent(), '学校');
+
+        $this->assertTrue($result);
+        $body = json_decode((string) $history[0]['request']->getBody(), true);
+        $this->assertSame([
+            'type' => 'icon',
+            'icon' => [
+                'name' => 'school',
+                'color' => 'green',
+            ],
+        ], $body['icon']);
     }
 
     public function test_regist_notion_event_returns_false_when_not_successful(): void

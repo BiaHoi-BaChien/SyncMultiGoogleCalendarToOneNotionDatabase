@@ -7,7 +7,7 @@ use Throwable;
 
 class NotionCheckConnection extends Command
 {
-    private const MIN_NOTION_VERSION = '2025-09-03';
+    private const MIN_NOTION_VERSION = '2026-03-11';
 
     private const REQUIRED_PROPERTIES = [
         'Name' => 'title',
