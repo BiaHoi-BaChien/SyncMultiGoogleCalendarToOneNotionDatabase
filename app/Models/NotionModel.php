@@ -196,11 +196,17 @@ class NotionModel
 
         if ($isHoliday) {
             $payload['icon'] = ['type' => 'emoji', 'emoji' => '🇯🇵'];
+        } elseif ($notion_label === config('app.google_calendar_label_school')) {
+            $payload['icon'] = [
+                'type' => 'icon',
+                'icon' => [
+                    'name' => 'school',
+                    'color' => 'green',
+                ],
+            ];
         }
 
-        $response = $this->client->post('pages', [
-            'json' => $payload,
-        ]);
+        $response = $this->client->post('pages', ['json' => $payload]);
 
         return $response->getStatusCode() === 200;
     }
