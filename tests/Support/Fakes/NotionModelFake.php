@@ -31,9 +31,9 @@ class NotionModelFake
         return self::$upcomingEventsReturn;
     }
 
-    public function registNotionEvent(object $event, string $label)
+    public function registNotionEvent(object $event, string $label, bool $isHoliday = false)
     {
-        self::$registCalls[] = [$event, $label];
+        self::$registCalls[] = [$event, $label, $isHoliday];
 
         $result = self::$registResults[$event->id] ?? false;
         if (is_callable($result)) {

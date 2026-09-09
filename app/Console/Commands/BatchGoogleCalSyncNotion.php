@@ -178,7 +178,7 @@ class BatchGoogleCalSyncNotion extends Command
 
                 // Notionに登録
                 try{
-                    $registered = $notions->registNotionEvent($event, $calendar['notion_label']);
+                    $registered = $notions->registNotionEvent($event, $calendar['notion_label'], $key === 'holiday');
                 }catch(\Exception $e){
                     report($e);
                     $this->error($e->getMessage());

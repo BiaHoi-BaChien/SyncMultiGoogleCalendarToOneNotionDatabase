@@ -177,9 +177,10 @@ class NotionModel
      *
      * @param Event $event
      * @param string $notion_label
+     * @param bool $isHoliday
      * @return bool
      */
-    public function registNotionEvent(Event $event, String $notion_label)
+    public function registNotionEvent(Event $event, String $notion_label, bool $isHoliday = false)
     {
         $page = $this->setPropaties($event, $notion_label);
 
@@ -193,7 +194,9 @@ class NotionModel
             'properties' => $page,
         ];
 
-        if ($notion_label === config('app.google_calendar_label_school')) {
+        if ($isHoliday) {
+            $payload['icon'] = ['type' => 'emoji', 'emoji' => '🇯🇵'];
+        } elseif ($notion_label === config('app.google_calendar_label_school')) {
             $payload['icon'] = [
                 'type' => 'icon',
                 'icon' => [
