@@ -83,6 +83,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ['2024-05-10 09:00', '2024-05-10 09:00', ['Holiday Label']],
         ], NotionModelFake::$getUpcomingArgs);
         $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertFalse(NotionModelFake::$registCalls[0][2]);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
@@ -560,6 +561,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             ['2024-09-15', '2024-09-15', []],
         ], NotionModelFake::$getUpcomingArgs);
         $this->assertCount(1, NotionModelFake::$registCalls);
+        $this->assertTrue(NotionModelFake::$registCalls[0][2]);
         $this->assertSame([], NotionModelFake::$deleteCalls);
 
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {

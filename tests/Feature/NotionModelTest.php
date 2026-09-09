@@ -122,7 +122,7 @@ class NotionModelTest extends TestCase
         $end->setDate('2024-02-12');
         $event->setEnd($end);
 
-        $result = $model->registNotionEvent($event, 'Holiday');
+        $result = $model->registNotionEvent($event, 'Holiday', true);
 
         $this->assertTrue($result);
         $this->assertCount(1, $history);
@@ -134,6 +134,7 @@ class NotionModelTest extends TestCase
         $body = json_decode((string) $request->getBody(), true);
         $this->assertSame('data_source_id', $body['parent']['type']);
         $this->assertSame('test-data-source-id', $body['parent']['data_source_id']);
+        $this->assertSame(['type' => 'emoji', 'emoji' => '🇯🇵'], $body['icon']);
 
         $this->assertSame('Company Retreat', $body['properties']['Name']['title'][0]['text']['content']);
         $this->assertSame([

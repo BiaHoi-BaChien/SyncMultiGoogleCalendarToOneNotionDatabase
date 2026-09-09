@@ -159,6 +159,7 @@ class NotionModelHttpTest extends TestCase
         $body = json_decode((string) $request->getBody(), true);
         $this->assertSame('data_source_id', $body['parent']['type']);
         $this->assertSame('test-data-source-id', $body['parent']['data_source_id']);
+        $this->assertArrayNotHasKey('icon', $body);
         $this->assertArrayHasKey('properties', $body);
         $this->assertArrayHasKey('Name', $body['properties']);
         $this->assertArrayHasKey('Date', $body['properties']);

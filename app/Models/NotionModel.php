@@ -177,22 +177,29 @@ class NotionModel
      *
      * @param Event $event
      * @param string $notion_label
+     * @param bool $isHoliday
      * @return bool
      */
-    public function registNotionEvent(Event $event, String $notion_label)
+    public function registNotionEvent(Event $event, String $notion_label, bool $isHoliday = false)
     {
         $page = $this->setPropaties($event, $notion_label);
 
         $dataSourceId = $this->getDataSourceId();
 
-        $response = $this->client->post('pages', [
-            'json' => [
-                'parent' => [
-                    'type' => 'data_source_id',
-                    'data_source_id' => $dataSourceId,
-                ],
-                'properties' => $page,
+        $payload = [
+            'parent' => [
+                'type' => 'data_source_id',
+                'data_source_id' => $dataSourceId,
             ],
+            'properties' => $page,
+        ];
+
+        if ($isHoliday) {
+            $payload['icon'] = ['type' => 'emoji', 'emoji' => '🇯🇵'];
+        }
+
+        $response = $this->client->post('pages', [
+            'json' => $payload,
         ]);
 
         return $response->getStatusCode() === 200;
