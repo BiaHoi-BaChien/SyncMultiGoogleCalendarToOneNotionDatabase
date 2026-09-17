@@ -8,10 +8,38 @@ use DateTimeZone;
 use Google\Service\Calendar\Event;
 use Google\Service\Calendar\EventDateTime;
 use ReflectionMethod;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class NotionModelSetPropertiesTest extends TestCase
 {
+    #[DataProvider('textBoundaries')]
+    public function test_title_and_location_respect_the_text_limit(string $character, int $length): void
+    {
+        $text = str_repeat($character, $length);
+        $event = $this->createEventWithDateTime('bounded', $text, '2026-09-17T09:00:00Z', '2026-09-17T10:00:00Z');
+        $event->setLocation($text);
+        $properties = $this->invokeSetProperties($event, 'Work');
+        $title = $properties['Name']['title'][0]['text']['content'];
+        $location = $properties['Location']['rich_text'][0]['text']['content'];
+        if (strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2 <= 2000) {
+            $this->assertSame($text, $title);
+            $this->assertSame($text, $location);
+        } else {
+            $this->assertSame('件名は上限文字数を超えているためGoogleカレンダーで確認してください', $title);
+            $this->assertSame('場所は上限文字数を超えているためGoogleカレンダーで確認してください', $location);
+        }
+    }
+
+    public static function textBoundaries(): array
+    {
+        return [
+            'empty' => ['a', 0], 'ASCII limit' => ['a', 2000], 'ASCII oversized' => ['a', 2001],
+            'Japanese limit' => ['あ', 2000], 'Japanese oversized' => ['あ', 2001],
+            'emoji limit' => ['📅', 1000], 'emoji oversized' => ['📅', 1001],
+        ];
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

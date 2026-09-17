@@ -13,6 +13,8 @@ class NotionModel
 {
     private const NOTION_RICH_TEXT_CONTENT_LIMIT = 2000;
     private const LONG_MEMO_FALLBACK = 'メモ本文は上限文字数を超えているためNotionからの同期はできませんでした';
+    private const LONG_TITLE_FALLBACK = '件名は上限文字数を超えているためGoogleカレンダーで確認してください';
+    private const LONG_LOCATION_FALLBACK = '場所は上限文字数を超えているためGoogleカレンダーで確認してください';
 
     private $client;
     private $databaseId;
@@ -244,7 +246,7 @@ class NotionModel
                 'title' => [
                     [
                         'type' => 'text',
-                        'text' => ['content' => $event->summary],
+                        'text' => ['content' => $this->boundedText($event->summary, self::LONG_TITLE_FALLBACK)],
                     ],
                 ],
             ];
@@ -283,9 +285,7 @@ class NotionModel
         ];
 
         if (!is_null($event->description)) {
-            $memo = mb_strlen($event->description) > self::NOTION_RICH_TEXT_CONTENT_LIMIT
-                ? self::LONG_MEMO_FALLBACK
-                : $event->description;
+            $memo = $this->boundedText($event->description, self::LONG_MEMO_FALLBACK);
 
             $properties['メモ'] = [
                 'rich_text' => [
@@ -302,13 +302,20 @@ class NotionModel
                 'rich_text' => [
                     [
                         'type' => 'text',
-                        'text' => ['content' => $event->location],
+                        'text' => ['content' => $this->boundedText($event->location, self::LONG_LOCATION_FALLBACK)],
                     ],
                 ],
             ];
         }
 
         return $properties;
+    }
+
+    private function boundedText(string $text, string $fallback): string
+    {
+        // Count supplementary characters as two units so either Unicode counting convention fits.
+        $length = strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2;
+        return $length > self::NOTION_RICH_TEXT_CONTENT_LIMIT ? $fallback : $text;
     }
 
 }
