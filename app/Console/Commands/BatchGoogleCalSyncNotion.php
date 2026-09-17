@@ -76,7 +76,7 @@ class BatchGoogleCalSyncNotion extends Command
         $deleteCountsByLabel = [];
         $syncDetails = [];
 
-        $notions = new NotionModel;
+        $notions = app(NotionModel::class);
 
         // 除外するジャンルのラベルを取得
         $excludeLabels = array_column($holidayCalendarList, 'notion_label');
@@ -95,7 +95,7 @@ class BatchGoogleCalSyncNotion extends Command
                 continue;
             }
 
-            $googlecal = new GoogleCalendarModel;
+            $googlecal = app(GoogleCalendarModel::class);
 
             try{
                 $events = $googlecal->getGoogleCalendarEventList($defaultTargetDateStart, $defaultTargetDateEnd, $calendar['calendar_id']);

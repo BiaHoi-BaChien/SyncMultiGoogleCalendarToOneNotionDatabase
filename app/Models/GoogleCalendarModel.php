@@ -5,6 +5,7 @@ namespace App\Models;
 use Google_Client;
 use Google_Service_Calendar;
 use Google\Service\Calendar\Event;
+use RuntimeException;
 
 class GoogleCalendarModel
 {
@@ -30,9 +31,29 @@ class GoogleCalendarModel
             'timeZone' => config('app.timezone'),
         );
 
-        $results = $service->events->listEvents($google_calendar_id, $optParams);
-        
-        return $results->getItems();
+        $events = [];
+        $seenPageTokens = [];
+        do {
+            $results = $service->events->listEvents($google_calendar_id, $optParams);
+            // An invalid response must never become an authoritative empty calendar.
+            if ($results->getKind() !== 'calendar#events' || !is_array($results->getItems())) {
+                throw new RuntimeException('Google Calendar returned an invalid event list.');
+            }
+            foreach ($results->getItems() as $event) {
+                $events[] = $event;
+            }
+
+            $nextPageToken = $results->getNextPageToken();
+            if ($nextPageToken !== null) {
+                if (!is_string($nextPageToken) || $nextPageToken === '' || isset($seenPageTokens[$nextPageToken])) {
+                    throw new RuntimeException('Google Calendar returned an invalid or repeated page token.');
+                }
+                $seenPageTokens[$nextPageToken] = true;
+                $optParams['pageToken'] = $nextPageToken;
+            }
+        } while ($nextPageToken !== null);
+
+        return $events;
     }
 
     /**
@@ -70,7 +91,7 @@ class GoogleCalendarModel
      *
      * @return Google_Client
      */
-    private  function getClient()
+    protected function getClient()
     {
         $client = new Google_Client();
 
