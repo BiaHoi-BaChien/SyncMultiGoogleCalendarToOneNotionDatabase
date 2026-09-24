@@ -30,6 +30,10 @@ class GoogleCalendarPaginationTest extends TestCase
         $this->assertSame('event-201', $events[200]->id);
         $this->assertCount(3, $history);
         parse_str($history[0]['request']->getUri()->getQuery(), $original);
+        $this->assertSame(
+            'kind,nextPageToken,items(id,summary,description,location,start(date,dateTime),end(date,dateTime),attendees(self,responseStatus))',
+            $original['fields']
+        );
         foreach ([1 => 'page-2', 2 => 'page-3'] as $index => $token) {
             parse_str($history[$index]['request']->getUri()->getQuery(), $query);
             $this->assertSame($token, $query['pageToken']);

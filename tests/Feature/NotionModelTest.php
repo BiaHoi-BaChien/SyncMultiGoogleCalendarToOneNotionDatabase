@@ -40,6 +40,12 @@ class NotionModelTest extends TestCase
     {
         $history = [];
         $model = $this->createModelWithResponses([
+            new Response(200, [], json_encode(['properties' => [
+                'Name' => ['id' => 'title'],
+                'Date' => ['id' => 'date-id'],
+                'ジャンル' => ['id' => 'genre-id'],
+                'googleCalendarId' => ['id' => 'google-id'],
+            ]])),
             new Response(200, [], json_encode([
                 'results' => [
                     [
@@ -64,8 +70,8 @@ class NotionModelTest extends TestCase
         $this->assertInstanceOf(Collection::class, $events);
         $this->assertSame(['upcoming-event-1'], $events->pluck('id')->all());
 
-        $this->assertCount(1, $history);
-        $request = $history[0]['request'];
+        $this->assertCount(2, $history);
+        $request = $history[1]['request'];
         $this->assertSame('POST', $request->getMethod());
         $this->assertSame('/v1/data_sources/test-data-source-id/query', $request->getUri()->getPath());
 
