@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\SyncReportMail;
 use App\Models\GoogleCalendarModel;
 use App\Models\NotionModel;
 use Google\Client as GoogleClient;
@@ -40,15 +41,16 @@ class SyncSecurityBoundaryTest extends TestCase
         $existing[] = $this->notionPage('removed');
         $history = [];
         $this->notion([
+            $this->schemaResponse(),
             new Response(200, [], json_encode(['results' => $existing])),
             new Response(200, [], '{}'),
         ], $history);
 
         $this->artisan('command:gcal-sync-notion')->assertExitCode(0);
 
-        $this->assertCount(2, $history);
-        $this->assertSame('PATCH', $history[1]['request']->getMethod());
-        $this->assertSame('/v1/pages/notion-removed', $history[1]['request']->getUri()->getPath());
+        $this->assertCount(3, $history);
+        $this->assertSame('PATCH', $history[2]['request']->getMethod());
+        $this->assertSame('/v1/pages/notion-removed', $history[2]['request']->getUri()->getPath());
     }
 
     #[DataProvider('unsafeSecondPages')]
@@ -92,17 +94,97 @@ class SyncSecurityBoundaryTest extends TestCase
             }
             return new Response(200, [], '{"id":"created"}');
         };
-        $this->notion([new Response(200, [], '{"results":[]}'), $acceptBoundedPage, $acceptBoundedPage], $history);
+        $this->notion([$this->schemaResponse(), new Response(200, [], '{"results":[]}'), $acceptBoundedPage, $acceptBoundedPage], $history);
 
         $this->artisan('command:gcal-sync-notion')->assertExitCode(0);
 
-        $this->assertCount(3, $history);
-        $first = json_decode((string) $history[1]['request']->getBody(), true)['properties'];
-        $second = json_decode((string) $history[2]['request']->getBody(), true)['properties'];
+        $this->assertCount(4, $history);
+        $first = json_decode((string) $history[2]['request']->getBody(), true)['properties'];
+        $second = json_decode((string) $history[3]['request']->getBody(), true)['properties'];
         $this->assertStringContainsString('上限文字数', $first['Name']['title'][0]['text']['content']);
         $this->assertStringContainsString('上限文字数', $first['Location']['rich_text'][0]['text']['content']);
         $this->assertSame('normal', $second['googleCalendarId']['rich_text'][0]['text']['content']);
         $this->assertSame('normal title', $second['Name']['title'][0]['text']['content']);
+    }
+
+    public function test_selected_fields_preserve_participation_event_details_and_deletion_reports(): void
+    {
+        config(['app.sync_report_mail_to' => 'sync@example.test']);
+        $today = date('Y-m-d');
+        $invitation = [
+            'id' => 'invitation', 'summary' => 'Meeting', 'description' => 'Agenda', 'location' => 'Room A',
+            'start' => ['dateTime' => $today.'T09:00:00+00:00'],
+            'end' => ['dateTime' => $today.'T10:00:00+00:00'],
+            'attendees' => [
+                ['responseStatus' => 'declined'],
+                ['self' => true, 'responseStatus' => 'needsAction'],
+            ],
+        ];
+        $declined = $this->event('declined');
+        $declined['attendees'] = [['self' => true, 'responseStatus' => 'declined']];
+        $this->google([
+            $this->page([$invitation, $declined], 'next'),
+            $this->page([$this->event('existing'), $this->event('all-day')]),
+        ]);
+        $removed = $this->notionPage('removed');
+        $removed['properties']['Name'] = ['title' => [['plain_text' => 'Removed meeting']]];
+        $history = [];
+        $this->notion([
+            $this->schemaResponse(),
+            new Response(200, [], json_encode([
+                'results' => [$this->notionPage('existing')], 'has_more' => true, 'next_cursor' => 'next',
+            ])),
+            new Response(200, [], json_encode(['results' => [$removed], 'has_more' => false])),
+            new Response(200, [], '{}'),
+            new Response(200, [], '{}'),
+            new Response(200, [], '{}'),
+        ], $history);
+
+        $this->artisan('command:gcal-sync-notion')->assertExitCode(0);
+
+        $this->assertCount(6, $history);
+        $meeting = json_decode((string) $history[3]['request']->getBody(), true)['properties'];
+        $allDay = json_decode((string) $history[4]['request']->getBody(), true)['properties'];
+        $this->assertSame('Meeting', $meeting['Name']['title'][0]['text']['content']);
+        $this->assertSame('Agenda', $meeting['メモ']['rich_text'][0]['text']['content']);
+        $this->assertSame('Room A', $meeting['Location']['rich_text'][0]['text']['content']);
+        $this->assertSame($invitation['start']['dateTime'], $meeting['Date']['date']['start']);
+        $this->assertSame($invitation['end']['dateTime'], $meeting['Date']['date']['end']);
+        $this->assertSame('all-day', $allDay['googleCalendarId']['rich_text'][0]['text']['content']);
+        $this->assertSame(['start' => $today], $allDay['Date']['date']);
+        $this->assertSame('PATCH', $history[5]['request']->getMethod());
+        $this->assertSame('/v1/pages/notion-removed', $history[5]['request']->getUri()->getPath());
+        Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) use ($today) {
+            return $mail->totals === ['Personal' => 3]
+                && $mail->details['Personal'] === [
+                    ['action' => '追加', 'start' => $today.' 09:00', 'summary' => 'Meeting'],
+                    ['action' => '追加', 'start' => $today, 'summary' => 'all-day title'],
+                    ['action' => '削除', 'start' => $today, 'summary' => 'Removed meeting'],
+                ];
+        });
+    }
+
+    public function test_missing_required_notion_property_stops_before_any_write(): void
+    {
+        $this->google([$this->page([$this->event('new')])]);
+        $history = [];
+        $this->notion([new Response(200, [], '{"properties":{}}')], $history);
+
+        $this->artisan('command:gcal-sync-notion')->assertExitCode(1);
+
+        $this->assertCount(1, $history);
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+        Mail::assertNothingSent();
+    }
+
+    private function schemaResponse(): Response
+    {
+        return new Response(200, [], json_encode(['properties' => [
+            'Name' => ['id' => 'title'],
+            'Date' => ['id' => 'date-id'],
+            'ジャンル' => ['id' => 'genre-id'],
+            'googleCalendarId' => ['id' => 'google-id'],
+        ]]));
     }
 
     private function event(string $id): array

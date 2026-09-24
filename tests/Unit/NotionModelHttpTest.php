@@ -10,6 +10,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\TestCase;
 
@@ -30,6 +31,7 @@ class NotionModelHttpTest extends TestCase
     {
         $history = [];
         $model = $this->createModelWithMockHandler([
+            $this->schemaResponse(),
             new Response(200, [], json_encode([
                 'results' => [
                     [
@@ -49,11 +51,18 @@ class NotionModelHttpTest extends TestCase
         $events = $model->getUpcomingNotionEvents('2024-01-01', '2024-01-31', ['Private', 'Skip']);
 
         $this->assertCount(1, $events);
-        $this->assertCount(1, $history);
+        $this->assertCount(2, $history);
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+        $this->assertSame('/v1/data_sources/test-data-source-id', $history[0]['request']->getUri()->getPath());
 
-        $request = $history[0]['request'];
+        $request = $history[1]['request'];
         $this->assertSame('POST', $request->getMethod());
         $this->assertSame('/v1/data_sources/test-data-source-id/query', $request->getUri()->getPath());
+        $this->assertSame(
+            'filter_properties=title&filter_properties=date%3Aid'
+                . '&filter_properties=genre%2Bid&filter_properties=google%253Aid',
+            $request->getUri()->getQuery()
+        );
 
         $body = json_decode((string) $request->getBody(), true);
         $this->assertArrayHasKey('filter', $body);
@@ -93,6 +102,7 @@ class NotionModelHttpTest extends TestCase
     {
         $history = [];
         $model = $this->createModelWithMockHandler([
+            $this->schemaResponse(),
             new Response(200, [], json_encode([
                 'results' => [
                     [
@@ -130,13 +140,48 @@ class NotionModelHttpTest extends TestCase
         $events = $model->getUpcomingNotionEvents('2024-01-01', '2024-01-31');
 
         $this->assertSame(['event-1', 'event-2'], $events->pluck('id')->all());
-        $this->assertCount(2, $history);
+        $this->assertCount(3, $history);
 
-        $firstBody = json_decode((string) $history[0]['request']->getBody(), true);
-        $secondBody = json_decode((string) $history[1]['request']->getBody(), true);
+        $firstBody = json_decode((string) $history[1]['request']->getBody(), true);
+        $secondBody = json_decode((string) $history[2]['request']->getBody(), true);
+        foreach ([1, 2] as $index) {
+            $this->assertSame(
+                'filter_properties=title&filter_properties=date%3Aid'
+                    . '&filter_properties=genre%2Bid&filter_properties=google%253Aid',
+                $history[$index]['request']->getUri()->getQuery()
+            );
+        }
 
         $this->assertArrayNotHasKey('start_cursor', $firstBody);
         $this->assertSame('cursor-2', $secondBody['start_cursor']);
+    }
+
+    #[DataProvider('invalidPropertySchemas')]
+    public function test_missing_or_invalid_property_ids_stop_before_querying(array $schema): void
+    {
+        $history = [];
+        $model = $this->createModelWithMockHandler([
+            new Response(200, [], json_encode($schema)),
+        ], $history);
+
+        try {
+            $model->getUpcomingNotionEvents('2024-01-01', '2024-01-31');
+            $this->fail('An incomplete schema must not be used to query calendar events.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('required Notion property id', $e->getMessage());
+        }
+        $this->assertCount(1, $history);
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+    }
+
+    public static function invalidPropertySchemas(): array
+    {
+        return [
+            'missing properties' => [[]],
+            'missing Date' => [['properties' => ['Name' => ['id' => 'title']]]],
+            'empty id' => [['properties' => ['Name' => ['id' => '']]]],
+            'non-string id' => [['properties' => ['Name' => ['id' => 42]]]],
+        ];
     }
 
     public function test_regist_notion_event_posts_page_payload_and_returns_true_on_success(): void
@@ -220,6 +265,18 @@ class NotionModelHttpTest extends TestCase
 
         $body = json_decode((string) $request->getBody(), true);
         $this->assertSame(['in_trash' => true], $body);
+    }
+
+    private function schemaResponse(): Response
+    {
+        return new Response(200, [], json_encode(['properties' => [
+            'Name' => ['id' => 'title'],
+            'Date' => ['id' => 'date%3Aid'],
+            'ジャンル' => ['id' => 'genre%2Bid'],
+            // The underlying ID contains the literal characters "%3A"; decode only once.
+            'googleCalendarId' => ['id' => 'google%253Aid'],
+            'メモ' => ['id' => 'memo-id'],
+        ]]));
     }
 
     private function createModelWithMockHandler(array $responses, array &$history): NotionModel

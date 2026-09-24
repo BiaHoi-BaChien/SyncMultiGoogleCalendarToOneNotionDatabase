@@ -24,6 +24,8 @@ class GoogleCalendarModel
 
         $optParams = array(
             'maxResults' => 200,
+            // Keep collection metadata for validation/pagination and attendee fields for participation checks.
+            'fields' => 'kind,nextPageToken,items(id,summary,description,location,start(date,dateTime),end(date,dateTime),attendees(self,responseStatus))',
             'orderBy' => 'startTime',
             'singleEvents' => true,
             'timeMin' => date('c', strtotime($targetDateStart ." 00:00:00")),

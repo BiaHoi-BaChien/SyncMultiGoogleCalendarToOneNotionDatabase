@@ -4,6 +4,7 @@ namespace App\Models;
 
 use DateInterval;
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Query;
 use Google\Service\Calendar\Event;
 use DateTime;
 use DateTimeZone;
@@ -123,6 +124,20 @@ class NotionModel
 
         $dataSourceId = $this->getDataSourceId();
 
+        // Resolve property IDs once per query, then reuse them across all result pages.
+        $schema = $this->getCalendarDataSourceSchema();
+        $propertyIds = [];
+        foreach (['Name', 'Date', 'ジャンル', 'googleCalendarId'] as $name) {
+            $propertyId = $schema['properties'][$name]['id'] ?? null;
+            if (!is_string($propertyId) || $propertyId === '') {
+                throw new RuntimeException("Unable to resolve required Notion property id: {$name}.");
+            }
+            // Notion returns URL-encoded IDs; decode once before Query::build encodes them.
+            $propertyIds[] = rawurldecode($propertyId);
+        }
+        // Notion expects repeated filter_properties parameters, without numeric array indexes.
+        $query = Query::build(['filter_properties' => $propertyIds]);
+
         $results = [];
         $startCursor = null;
 
@@ -138,6 +153,7 @@ class NotionModel
             }
 
             $response = $this->client->post('data_sources/' . $dataSourceId . '/query', [
+                'query' => $query,
                 'json' => $payload,
             ]);
 
