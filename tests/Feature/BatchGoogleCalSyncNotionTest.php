@@ -144,7 +144,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             return $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
                 && !isset($request['channel'])
                 && !isset($request['thread_ts'])
-                && $request['text'] === "Personal Label: 1件\n  - (追加) 2024-05-10 09:00 Board Meeting\n以上の予定をNotionデータベースに同期しました。";
+                && $request['text'] === "[Notion連携Googleカレンダー]\nPersonal Label: 1件\n  - (追加) 2024-05-10 09:00 Board Meeting\n以上の予定をNotionデータベースに同期しました。";
         });
     }
 
@@ -183,7 +183,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             return $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
                 && !isset($request['channel'])
                 && !isset($request['thread_ts'])
-                && $request['text'] === "Personal Label: 1件\n  - (追加) 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
+                && $request['text'] === "[Notion連携Googleカレンダー]\nPersonal Label: 1件\n  - (追加) 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
         });
 
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
@@ -239,9 +239,9 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Http::assertSentCount(2);
         Http::assertSentInOrder([
             fn ($request) => $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
-                && str_starts_with($request['text'], 'Personal Label: 1件'),
+                && str_starts_with($request['text'], "[Notion連携Googleカレンダー]\nPersonal Label: 1件"),
             fn ($request) => $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
-                && $request['text'] === 'エラー: [RuntimeException] Mail delivery failed.'
+                && $request['text'] === "[Notion連携Googleカレンダー]\nエラー: [RuntimeException] Mail delivery failed."
                 && !isset($request['channel'])
                 && !isset($request['thread_ts']),
         ]);
