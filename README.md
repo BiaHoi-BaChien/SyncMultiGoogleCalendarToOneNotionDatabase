@@ -134,7 +134,7 @@ php artisan command:gcal-sync-notion holiday
 同期で新規に登録したイベントがある場合、下記の方法でレポートを送信します。
 
 - **メール通知**: `SYNC_REPORT_MAIL_TO` に送信先を設定すると、同期件数と各イベントの概要をテキストメールで送信します。
-- **Slack 通知**: `SLACK_BOT=true` にすると、Incoming Webhook に紐づく送信先へ同じ内容を投稿します。その後メール送信に失敗した場合は、同じ送信先へ別メッセージでエラー概要を投稿します。
+- **Slack 通知**: `SLACK_BOT=true` にすると、Incoming Webhook に紐づく送信先へ同じ内容を投稿します。その後メール送信に失敗した場合は、同じ送信先へ別メッセージでエラー概要を投稿します。各メッセージの先頭行には `[Notion連携Googleカレンダー]` が付きます。
 
 Slack 通知を利用するには、開発者向けのアプリ設定から Incoming Webhook URL を取得します。
 

@@ -35,7 +35,7 @@ class SlackNotifier
 
         try {
             $response = Http::connectTimeout(5)->timeout(10)->withoutRedirecting()
-                ->post($this->webhookUrl, ['text' => $text]);
+                ->post($this->webhookUrl, ['text' => "[Notion連携Googleカレンダー]\n" . $text]);
         } catch (Throwable) {
             // Webhook URLには秘密情報が含まれるため、元の例外をログへ渡さない。
             throw new RuntimeException('Slack Webhook request failed.');

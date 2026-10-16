@@ -39,7 +39,7 @@ class SlackNotifierTest extends TestCase
             && $request->method() === 'POST'
             && $request->hasHeader('Content-Type', 'application/json')
             && !$request->hasHeader('Authorization')
-            && $request->data() === ['text' => '同期レポート']);
+            && $request->data() === ['text' => "[Notion連携Googleカレンダー]\n同期レポート"]);
     }
 
     #[DataProvider('disabledSettings')]
@@ -144,7 +144,7 @@ class SlackNotifierTest extends TestCase
 
         Http::assertSentCount(1);
         Http::assertSent(fn ($request) => $request->url() === self::WEBHOOK_URL
-            && $request->data() === ['text' => 'エラー: [RuntimeException] Mail delivery failed.']);
+            && $request->data() === ['text' => "[Notion連携Googleカレンダー]\nエラー: [RuntimeException] Mail delivery failed."]);
     }
 
     public function test_notify_error_reports_sanitized_failure_without_throwing(): void
