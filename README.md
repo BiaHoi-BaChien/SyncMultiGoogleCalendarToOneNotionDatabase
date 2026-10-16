@@ -2,7 +2,7 @@
 
 複数のGoogleカレンダーの予定を1つのNotionカレンダーに同期するバッチです。Google側のイベントをNotionに追加し、Googleに存在しないイベントを削除します（祝日カレンダーのみのモードでは削除を行いません）。イベント内容の更新には対応していません。
 
-- 同期で新しく登録した件数とイベント概要を、メールおよび Slack DM（任意設定）でレポートできます。
+- 同期で新しく登録した件数とイベント概要を、メールおよび Slack Incoming Webhook（任意設定）でレポートできます。
 - Notion Data Source ID を `.env` に設定しなくても、API から自動取得してキャッシュします。
 - Googleの全ページ取得が完了してからNotionの同期を開始します。取得失敗や不正なページ情報があった場合は同期を中止します。
 - Googleのイベント一覧とNotionの予定一覧は、同期・参加判定・通知に必要な項目だけを取得します。Notionは一覧取得の前にスキーマを1回読み取り、`Name`・`Date`・`ジャンル`・`googleCalendarId`のプロパティIDを解決して全ページに適用します。必須項目のIDを取得できない場合は同期を中止します。
@@ -82,8 +82,7 @@ SYNC_REPORT_MAIL_TO=notify@example.com
 
 # Slack (任意)
 SLACK_BOT=false
-SLACK_BOT_TOKEN=xoxb-...
-SLACK_DM_USER_IDS=U12345678,U23456789
+SLACK_WEBHOOK_URL=
 
 # Notion
 NOTION_API_TOKEN=notion_api_token
@@ -101,7 +100,7 @@ SYNC_MAX_DAYS=90
 - `SYNC_MAX_DAYS` は今日から何日先までの予定を同期するかを制御します。
 - `SYNC_REPORT_MAIL_TO` を設定すると同期結果のサマリーメールが送信されます。空の場合はメール送信をスキップします。
 - SMTPは暗号化が必須です。`MAIL_ENCRYPTION=ssl` は接続時からTLS（通常465番）、`MAIL_ENCRYPTION=tls` はSTARTTLS（通常587番）を使います。465番は接続時からTLSを使います。TLSを確立できないサーバーでは認証情報・メール本文を送信せず失敗します。
-- Slack 通知を利用したい場合は `SLACK_BOT=true` とし、Bot User OAuth Token（`SLACK_BOT_TOKEN`）と DM を送りたいユーザー ID（カンマ区切りで指定）を設定してください。Slack 設定が完了していない場合は通知を送信しません。
+- Slack 通知を利用したい場合は `SLACK_BOT=true` とし、NotifyFromHostinger アプリで発行した Incoming Webhook URL を `SLACK_WEBHOOK_URL` に設定してください。URL が未設定の場合は通知を送信しません。
 
 タイムゾーンを変更したい場合は `.env` の `TIMEZONE` を編集してください（未設定時のデフォルトは `Asia/Ho_Chi_Minh`）。
 
@@ -135,17 +134,31 @@ php artisan command:gcal-sync-notion holiday
 同期で新規に登録したイベントがある場合、下記の方法でレポートを送信します。
 
 - **メール通知**: `SYNC_REPORT_MAIL_TO` に送信先を設定すると、同期件数と各イベントの概要をテキストメールで送信します。
-- **Slack 通知**: Slack Bot を有効化すると、指定したユーザーの DM に同じ内容を投稿します。エラーが発生した場合は同スレッドにエラー概要も送信します。
+- **Slack 通知**: `SLACK_BOT=true` にすると、Incoming Webhook に紐づく送信先へ同じ内容を投稿します。その後メール送信に失敗した場合は、同じ送信先へ別メッセージでエラー概要を投稿します。
 
-Slack 通知を利用するには、Bot User OAuth Token を取得した上で `.env` に次の値を設定してください。
+Slack 通知を利用するには、開発者向けのアプリ設定から Incoming Webhook URL を取得します。
+
+1. [Slack の Your Apps](https://api.slack.com/apps) を開きます。
+2. **NotifyFromHostinger** を選択します。
+3. 左メニューの **Incoming Webhooks** を開きます。
+4. **Webhook URLs for Your Workspace** で対象の送信先を確認し、**Copy** で URL をコピーします。
+
+アプリが一覧に表示されない場合は、アプリの作成者に確認してください。
+
+取得した Webhook URL を使い、実行環境の `.env` に次の値を設定してください。設定画面の URL 自体は送信には使えません。
 
 ```dotenv
 SLACK_BOT=true
-SLACK_BOT_TOKEN=xoxb-...
-SLACK_DM_USER_IDS=U12345678,U23456789
+SLACK_WEBHOOK_URL=
 ```
 
-`SLACK_DM_USER_IDS` には通知したいユーザー ID をカンマ区切りで指定します。設定が不足している場合は Slack への投稿を自動的にスキップします。
+`SLACK_WEBHOOK_URL` にコピーした URL を設定してください。実際の Webhook URL は秘密情報なので、Git やログに残さず `.env` で管理してください。既存の `SLACK_BOT` は引き続き通知の有効・無効を切り替えるフラグとして使用します。従来の `SLACK_BOT_TOKEN` と `SLACK_DM_USER_IDS` は不要です。移行時に `SLACK_WEBHOOK_URL` を追加しないと Slack 通知はスキップされます。
+
+送信先・投稿名・アイコンは Slack アプリ側の設定に従います。Webhook の応答にはメッセージ ID が含まれないため、エラー通知を元の投稿のスレッドには追加しません。詳しくは [Slack の Incoming Webhooks 仕様](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)を参照してください。
+
+Webhook の失敗や不正な応答はバッチのエラーとして扱います。その場合、従来と同様に後続のメール通知は実行されません。通知の前に完了した同期は取り消されません。
+
+設定キャッシュを使用している環境では、`.env` の変更後に `php artisan config:clear` を実行してください。デプロイには `.env` が含まれないため、Hostinger 側にも設定が必要です。
 
 ### 8. スケジュール設定（任意）
 

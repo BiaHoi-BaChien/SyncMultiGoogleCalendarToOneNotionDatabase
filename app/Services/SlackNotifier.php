@@ -10,63 +10,49 @@ class SlackNotifier
 {
     private bool $enabled;
 
-    private ?string $token;
+    private string $webhookUrl;
 
-    /**
-     * @var array<int, string>
-     */
-    private array $userIds;
-
-    public function __construct(?bool $enabled = null, ?string $token = null, ?string $userIds = null)
+    public function __construct(?bool $enabled = null, ?string $webhookUrl = null)
     {
         $this->enabled = $this->normalizeEnabled($enabled ?? config('app.slack_bot_enabled'));
-        $this->token = $token ?? config('app.slack_bot_token');
-        $this->userIds = $this->parseUserIds($userIds ?? config('app.slack_dm_user_ids'));
+        $this->webhookUrl = trim($webhookUrl ?? config('app.slack_webhook_url') ?? '');
     }
 
     public function isEnabled(): bool
     {
-        return $this->enabled && !empty($this->token) && !empty($this->userIds);
+        return $this->enabled && $this->webhookUrl !== '';
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public function send(string $text): array
+    public function send(string $text): void
     {
         if (!$this->isEnabled()) {
-            return [];
+            return;
         }
 
-        $results = [];
-        foreach ($this->userIds as $userId) {
-            $response = Http::withToken($this->token)->post('https://slack.com/api/chat.postMessage', [
-                'channel' => $userId,
-                'text' => $text,
-            ]);
-
-            if (!$response->successful()) {
-                throw new RuntimeException('Slack API request failed: HTTP ' . $response->status());
-            }
-
-            $data = $response->json();
-            if (!is_array($data) || ($data['ok'] ?? false) !== true || !isset($data['ts'])) {
-                $errorCode = is_array($data) ? ($data['error'] ?? 'unknown_error') : 'invalid_response';
-                throw new RuntimeException('Slack API error: ' . $errorCode);
-            }
-
-            $results[$userId] = (string) $data['ts'];
+        if (preg_match('~\Ahttps://hooks\.slack\.com/services/[A-Za-z0-9]+/[A-Za-z0-9]+/[A-Za-z0-9]+\z~', $this->webhookUrl) !== 1) {
+            throw new RuntimeException('Slack Webhook URL is invalid.');
         }
 
-        return $results;
+        try {
+            $response = Http::connectTimeout(5)->timeout(10)->withoutRedirecting()
+                ->post($this->webhookUrl, ['text' => $text]);
+        } catch (Throwable) {
+            // Webhook URLには秘密情報が含まれるため、元の例外をログへ渡さない。
+            throw new RuntimeException('Slack Webhook request failed.');
+        }
+
+        if (!$response->successful()) {
+            throw new RuntimeException('Slack Webhook request failed: HTTP ' . $response->status());
+        }
+
+        if (trim($response->body()) !== 'ok') {
+            throw new RuntimeException('Slack Webhook returned an unexpected response.');
+        }
     }
 
-    /**
-     * @param array<string, string> $messages
-     */
-    public function notifyError(array $messages, Throwable $error): void
+    public function notifyError(Throwable $error): void
     {
-        if (!$this->isEnabled() || empty($messages)) {
+        if (!$this->isEnabled()) {
             return;
         }
 
@@ -77,31 +63,11 @@ class SlackNotifier
         $summary = mb_substr($summary, 0, 200);
         $text = sprintf('エラー: [%s] %s', class_basename($error), $summary);
 
-        foreach ($messages as $userId => $threadTs) {
-            try {
-                Http::withToken($this->token)->post('https://slack.com/api/chat.postMessage', [
-                    'channel' => $userId,
-                    'text' => $text,
-                    'thread_ts' => $threadTs,
-                ]);
-            } catch (Throwable $threadError) {
-                report($threadError);
-            }
+        try {
+            $this->send($text);
+        } catch (Throwable $notificationError) {
+            report($notificationError);
         }
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function parseUserIds(?string $userIds): array
-    {
-        if ($userIds === null) {
-            return [];
-        }
-
-        $ids = array_filter(array_map('trim', explode(',', $userIds)));
-
-        return array_values($ids);
     }
 
     private function normalizeEnabled($enabled): bool
