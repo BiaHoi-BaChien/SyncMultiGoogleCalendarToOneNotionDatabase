@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Tests\Support\Fakes\GoogleCalendarModelFake;
 use Tests\Support\Fakes\NotionModelFake;
@@ -48,8 +49,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         config()->set('app.sync_max_days', 0);
         config()->set('app.slack_bot_enabled', false);
-        config()->set('app.slack_bot_token', null);
-        config()->set('app.slack_dm_user_ids', null);
+        config()->set('app.slack_webhook_url', null);
     }
 
     public function test_command_sends_mail_when_new_events_synced(): void
@@ -57,6 +57,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
         config()->set('app.sync_max_days', 3);
+        config()->set('app.slack_webhook_url', 'https://hooks.slack.com/services/T00000000/B00000000/testsecret');
+        Http::fake();
 
         $event = (object) [
             'id' => 'event-1',
@@ -78,6 +80,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
+        Http::assertNothingSent();
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
         $this->assertSame([
             ['2024-05-10 09:00', '2024-05-10 09:00', ['Holiday Label']],
@@ -105,13 +108,12 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         });
     }
 
-    public function test_command_sends_slack_dm_when_enabled(): void
+    public function test_command_sends_slack_webhook_when_enabled(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', null);
         config()->set('app.slack_bot_enabled', true);
-        config()->set('app.slack_bot_token', 'xoxb-test-token');
-        config()->set('app.slack_dm_user_ids', 'U0123456789');
+        config()->set('app.slack_webhook_url', 'https://hooks.slack.com/services/T00000000/B00000000/testsecret');
 
         $event = (object) [
             'id' => 'event-1',
@@ -131,10 +133,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Mail::fake();
 
         Http::fake([
-            'https://slack.com/api/chat.postMessage' => Http::response([
-                'ok' => true,
-                'ts' => '1714976400.000100',
-            ]),
+            'https://hooks.slack.com/services/T00000000/B00000000/testsecret' => Http::response('ok'),
         ]);
 
         $this->artisan('command:gcal-sync-notion')
@@ -142,8 +141,9 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         Http::assertSentCount(1);
         Http::assertSent(function ($request) {
-            return $request->url() === 'https://slack.com/api/chat.postMessage'
-                && $request['channel'] === 'U0123456789'
+            return $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
+                && !isset($request['channel'])
+                && !isset($request['thread_ts'])
                 && $request['text'] === "Personal Label: 1件\n  - (追加) 2024-05-10 09:00 Board Meeting\n以上の予定をNotionデータベースに同期しました。";
         });
     }
@@ -153,8 +153,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
         config()->set('app.slack_bot_enabled', true);
-        config()->set('app.slack_bot_token', 'xoxb-test-token');
-        config()->set('app.slack_dm_user_ids', 'U0123456789');
+        config()->set('app.slack_webhook_url', 'https://hooks.slack.com/services/T00000000/B00000000/testsecret');
 
         $event = (object) [
             'id' => 'event-1',
@@ -174,18 +173,16 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         Mail::fake();
 
         Http::fake([
-            'https://slack.com/api/chat.postMessage' => Http::response([
-                'ok' => true,
-                'ts' => '1714976400.000100',
-            ]),
+            'https://hooks.slack.com/services/T00000000/B00000000/testsecret' => Http::response('ok'),
         ]);
 
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
 
         Http::assertSent(function ($request) {
-            return $request->url() === 'https://slack.com/api/chat.postMessage'
-                && $request['channel'] === 'U0123456789'
+            return $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
+                && !isset($request['channel'])
+                && !isset($request['thread_ts'])
                 && $request['text'] === "Personal Label: 1件\n  - (追加) 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
         });
 
@@ -197,6 +194,57 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             return str_contains($rendered, 'R&D & QA <Review>')
                 && !str_contains($rendered, 'R&amp;D &amp; QA &lt;Review&gt;');
         });
+    }
+
+    public function test_command_skips_slack_when_webhook_is_missing_and_still_sends_mail(): void
+    {
+        $this->setUpNotificationEvent();
+        config()->set('app.slack_webhook_url', null);
+        Http::fake();
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->assertExitCode(Command::SUCCESS);
+
+        Http::assertNothingSent();
+        Mail::assertSent(SyncReportMail::class);
+    }
+
+    public function test_command_stops_before_mail_when_slack_webhook_fails(): void
+    {
+        $this->setUpNotificationEvent();
+        Http::fake(['*' => Http::response('internal_error', 500)]);
+        Mail::fake();
+
+        $this->artisan('command:gcal-sync-notion')
+            ->expectsOutput('Slack Webhook request failed: HTTP 500')
+            ->assertExitCode(Command::FAILURE);
+
+        Http::assertSentCount(1);
+        Mail::assertNothingSent();
+    }
+
+    public function test_command_posts_separate_slack_message_when_mail_fails(): void
+    {
+        $this->setUpNotificationEvent();
+        Http::fake(['*' => Http::response('ok')]);
+        Mail::shouldReceive('to')->once()->with('notify@example.com')->andReturnSelf();
+        Mail::shouldReceive('send')->once()->with(\Mockery::type(SyncReportMail::class))
+            ->andThrow(new RuntimeException('Mail delivery failed.'));
+
+        $this->artisan('command:gcal-sync-notion')
+            ->expectsOutput('Mail delivery failed.')
+            ->assertExitCode(Command::FAILURE);
+
+        Http::assertSentCount(2);
+        Http::assertSentInOrder([
+            fn ($request) => $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
+                && str_starts_with($request['text'], 'Personal Label: 1件'),
+            fn ($request) => $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
+                && $request['text'] === 'エラー: [RuntimeException] Mail delivery failed.'
+                && !isset($request['channel'])
+                && !isset($request['thread_ts']),
+        ]);
     }
 
     public function test_command_skips_mail_when_only_existing_events(): void
@@ -796,6 +844,24 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $this->assertSame([], GoogleCalendarModelFake::$getListCalls);
         Mail::assertNothingSent();
+    }
+
+    private function setUpNotificationEvent(): void
+    {
+        $this->setDefaultCalendarConfig();
+        config()->set('app.sync_report_mail_to', 'notify@example.com');
+        config()->set('app.slack_bot_enabled', true);
+        config()->set('app.slack_webhook_url', 'https://hooks.slack.com/services/T00000000/B00000000/testsecret');
+
+        NotionModelFake::$upcomingEventsReturn = collect();
+        NotionModelFake::$registResults = ['event-1' => true];
+        GoogleCalendarModelFake::$eventLists = [
+            'calendar-personal' => [(object) [
+                'id' => 'event-1',
+                'summary' => 'Board Meeting',
+                'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
+            ]],
+        ];
     }
 
     private function makeNotionEvent(

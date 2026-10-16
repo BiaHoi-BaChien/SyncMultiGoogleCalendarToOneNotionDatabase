@@ -273,9 +273,8 @@ class BatchGoogleCalSyncNotion extends Command
                 $bodyText = SyncReportFormatter::formatText($totals, $syncDetails);
 
                 $slackNotifier = new SlackNotifier();
-                $slackMessages = [];
                 try {
-                    $slackMessages = $slackNotifier->send($bodyText);
+                    $slackNotifier->send($bodyText);
                 } catch (\Throwable $e) {
                     report($e);
                     $this->error($e->getMessage());
@@ -288,7 +287,7 @@ class BatchGoogleCalSyncNotion extends Command
                     try {
                         Mail::to($mailTo)->send(new SyncReportMail($totals, $syncDetails));
                     } catch (\Throwable $e) {
-                        $slackNotifier->notifyError($slackMessages ?? [], $e);
+                        $slackNotifier->notifyError($e);
                         report($e);
                         $this->error($e->getMessage());
                         return Command::FAILURE;
