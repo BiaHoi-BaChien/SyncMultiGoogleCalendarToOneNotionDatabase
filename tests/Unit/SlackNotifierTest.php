@@ -42,6 +42,40 @@ class SlackNotifierTest extends TestCase
             && $request->data() === ['text' => "[Notion連携Googleカレンダー]\n同期レポート"]);
     }
 
+    #[DataProvider('slackControlText')]
+    public function test_send_encodes_slack_control_syntax_as_literal_text(string $text, string $encodedText): void
+    {
+        Http::fake([self::WEBHOOK_URL => Http::response('ok')]);
+
+        (new SlackNotifier(true, self::WEBHOOK_URL))->send($text);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) =>
+            $request->data() === ['text' => "[Notion連携Googleカレンダー]\n" . $encodedText]);
+    }
+
+    public static function slackControlText(): array
+    {
+        return [
+            'mentions' => [
+                '<!channel> <!here> <!everyone> <@U123>',
+                '&lt;!channel&gt; &lt;!here&gt; &lt;!everyone&gt; &lt;@U123&gt;',
+            ],
+            'links and groups' => [
+                '<https://example.test|通知> <!subteam^S123> <#C123>',
+                '&lt;https://example.test|通知&gt; &lt;!subteam^S123&gt; &lt;#C123&gt;',
+            ],
+            'already encoded text' => [
+                '&lt;!channel&gt; &#60;@U123&#62; &#x3c;!here&#x3e;',
+                '&amp;lt;!channel&amp;gt; &amp;#60;@U123&amp;#62; &amp;#x3c;!here&amp;#x3e;',
+            ],
+            'ordinary text and URL' => [
+                "定例会議 R&D <Review>\nhttps://example.test/?a=1&b=2",
+                "定例会議 R&amp;D &lt;Review&gt;\nhttps://example.test/?a=1&amp;b=2",
+            ],
+        ];
+    }
+
     #[DataProvider('disabledSettings')]
     public function test_disabled_or_unconfigured_notifier_sends_nothing(bool $enabled, string $url): void
     {
@@ -140,11 +174,11 @@ class SlackNotifierTest extends TestCase
 
         $notifier = new SlackNotifier(true, self::WEBHOOK_URL);
 
-        $notifier->notifyError(new RuntimeException('Mail delivery failed.'));
+        $notifier->notifyError(new RuntimeException('Mail <@U123> & <!here> failed.'));
 
         Http::assertSentCount(1);
         Http::assertSent(fn ($request) => $request->url() === self::WEBHOOK_URL
-            && $request->data() === ['text' => "[Notion連携Googleカレンダー]\nエラー: [RuntimeException] Mail delivery failed."]);
+            && $request->data() === ['text' => "[Notion連携Googleカレンダー]\nエラー: [RuntimeException] Mail &lt;@U123&gt; &amp; &lt;!here&gt; failed."]);
     }
 
     public function test_notify_error_reports_sanitized_failure_without_throwing(): void

@@ -148,7 +148,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         });
     }
 
-    public function test_sync_report_special_characters_are_not_escaped_for_slack_or_mail(): void
+    public function test_sync_report_escapes_slack_control_syntax_but_preserves_plain_text_mail(): void
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
@@ -157,7 +157,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
         $event = (object) [
             'id' => 'event-1',
-            'summary' => 'R&D & QA <Review>',
+            'summary' => 'R&D & QA <Review> <!channel> <@U123>',
             'start' => (object) ['dateTime' => '2024-05-10T09:00:00+09:00'],
         ];
 
@@ -183,7 +183,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
             return $request->url() === 'https://hooks.slack.com/services/T00000000/B00000000/testsecret'
                 && !isset($request['channel'])
                 && !isset($request['thread_ts'])
-                && $request['text'] === "[Notion連携Googleカレンダー]\nPersonal Label: 1件\n  - (追加) 2024-05-10 09:00 R&D & QA <Review>\n以上の予定をNotionデータベースに同期しました。";
+                && $request['text'] === "[Notion連携Googleカレンダー]\nPersonal Label: 1件\n  - (追加) 2024-05-10 09:00 R&amp;D &amp; QA &lt;Review&gt; &lt;!channel&gt; &lt;@U123&gt;\n以上の予定をNotionデータベースに同期しました。";
         });
 
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) {
@@ -191,7 +191,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
 
             $rendered = $mail->render();
 
-            return str_contains($rendered, 'R&D & QA <Review>')
+            return str_contains($rendered, 'R&D & QA <Review> <!channel> <@U123>')
                 && !str_contains($rendered, 'R&amp;D &amp; QA &lt;Review&gt;');
         });
     }
@@ -635,6 +635,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
     {
         $this->setDefaultCalendarConfig();
         config()->set('app.sync_report_mail_to', 'notify@example.com');
+        config()->set('app.slack_bot_enabled', true);
+        config()->set('app.slack_webhook_url', 'https://hooks.slack.com/services/T00000000/B00000000/testsecret');
         $today = date('Y-m-d');
 
         $notionEvents = collect([
@@ -648,7 +650,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                     ],
                     'Name' => [
                         'title' => [
-                            ['plain_text' => 'Stale Notion Event'],
+                            ['plain_text' => 'Stale <!here> & <@U123>'],
                         ],
                     ],
                     'Date' => [
@@ -710,6 +712,7 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         ];
 
         Mail::fake();
+        Http::fake(['*' => Http::response('ok')]);
 
         $this->artisan('command:gcal-sync-notion')
             ->assertExitCode(Command::SUCCESS);
@@ -717,6 +720,8 @@ class BatchGoogleCalSyncNotionTest extends TestCase
         $this->assertSame(1, NotionModelFake::$getUpcomingCalls);
         $this->assertSame([], NotionModelFake::$registCalls);
         $this->assertSame(['notion-event-1'], NotionModelFake::$deleteCalls);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request['text'] === "[Notion連携Googleカレンダー]\nPersonal Label: 1件\n  - (削除) " . $today . " 10:00 Stale &lt;!here&gt; &amp; &lt;@U123&gt;\n以上の予定をNotionデータベースに同期しました。");
         Mail::assertSent(SyncReportMail::class, function (SyncReportMail $mail) use ($today) {
             $mail->build();
 
@@ -728,13 +733,13 @@ class BatchGoogleCalSyncNotionTest extends TestCase
                         [
                             'action' => '削除',
                             'start' => $today . ' 10:00',
-                            'summary' => 'Stale Notion Event',
+                            'summary' => 'Stale <!here> & <@U123>',
                         ],
                     ],
                 ]
                 && is_string($rendered)
                 && str_contains($rendered, 'Personal Label: 1件')
-                && str_contains($rendered, '  - (削除) ' . $today . ' 10:00 Stale Notion Event');
+                && str_contains($rendered, '  - (削除) ' . $today . ' 10:00 Stale <!here> & <@U123>');
         });
     }
 

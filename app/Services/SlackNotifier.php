@@ -33,6 +33,9 @@ class SlackNotifier
             throw new RuntimeException('Slack Webhook URL is invalid.');
         }
 
+        // 外部由来の本文をSlackのメンションやリンク構文として解釈させない。
+        $text = strtr($text, ['&' => '&amp;', '<' => '&lt;', '>' => '&gt;']);
+
         try {
             $response = Http::connectTimeout(5)->timeout(10)->withoutRedirecting()
                 ->post($this->webhookUrl, ['text' => "[Notion連携Googleカレンダー]\n" . $text]);
