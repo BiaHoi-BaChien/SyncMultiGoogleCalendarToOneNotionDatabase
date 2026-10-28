@@ -5,7 +5,7 @@
     "keywords": ["framework", "laravel"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.5.12",
         "google/apiclient": "^2.11",
         "guzzlehttp/guzzle": "^7.9",
         "laravel/framework": "^13.0"
@@ -55,7 +55,7 @@
         "preferred-install": "dist",
         "sort-packages": true,
         "platform": {
-            "php": "8.3.0"
+            "php": "8.5.12"
         }
     },
     "minimum-stability": "stable",
